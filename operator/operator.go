@@ -291,12 +291,15 @@ func (o *Operator) Start(ctx context.Context) error {
 			sub = o.avsSubscriber.SubscribeToNewTasks(o.newTaskCreatedChan)
 		case newTaskCreatedLog := <-o.newTaskCreatedChan:
 			o.metrics.IncNumTasksReceived()
+			// TODO: call aggregator API to check if task has received enough response
 			taskResponse := o.ProcessNewTaskCreatedLog(newTaskCreatedLog)
 			signedTaskResponse, err := o.SignTaskResponse(taskResponse)
 			if err != nil {
 				continue
 			}
-			go o.aggregatorRpcClient.SendSignedTaskResponseToAggregator(signedTaskResponse)
+			// TODO: send response to aggregator
+			o.logger.Info("Processed task", "success", signedTaskResponse)
+			// go o.aggregatorRpcClient.SendSignedTaskResponseToAggregator(signedTaskResponse)
 		}
 	}
 }
@@ -306,16 +309,21 @@ func (o *Operator) Start(ctx context.Context) error {
 func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) *cstaskmanager.IOpenOracleTaskManagerTaskResponse {
 	o.logger.Debug("Received new task", "task", newTaskCreatedLog)
 	o.logger.Info("Received new task",
-		"numberToBeSquared", newTaskCreatedLog.Task.GoldPriceTimestamp,
+		"goldPriceTimestamp", newTaskCreatedLog.Task.GoldPriceTimestamp,
 		"taskIndex", newTaskCreatedLog.TaskIndex,
 		"taskCreatedBlock", newTaskCreatedLog.Task.TaskCreatedBlock,
 		"quorumNumbers", newTaskCreatedLog.Task.QuorumNumbers,
 		"QuorumThresholdPercentage", newTaskCreatedLog.Task.QuorumThresholdPercentage,
 	)
-	goldPrice := big.NewInt(0).Exp(newTaskCreatedLog.Task.GoldPriceTimestamp, big.NewInt(2), nil)
+	goldPrice, error := FetchGoldPrice()
+	if error != nil {
+		o.logger.Error("Fetching gold price", "error", error)
+		goldPrice = 0
+	}
+	o.logger.Info("Fetching gold price", "price", goldPrice)
 	taskResponse := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 		ReferenceTaskIndex: newTaskCreatedLog.TaskIndex,
-		GoldPrice:          goldPrice,
+		GoldPrice:          big.NewInt(goldPrice),
 	}
 	return taskResponse
 }

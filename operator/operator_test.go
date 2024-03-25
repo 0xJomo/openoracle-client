@@ -48,13 +48,13 @@ func TestOperator(t *testing.T) {
 	})
 
 	t.Run("Start", func(t *testing.T) {
-		var numberToBeSquared = big.NewInt(3)
+		var goldPriceTimestamp = big.NewInt(3)
 
 		// new task event
 		newTaskCreatedEvent := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				GoldPriceTimestamp:        numberToBeSquared,
+				GoldPriceTimestamp:        goldPriceTimestamp,
 				TaskCreatedBlock:          1000,
 				QuorumNumbers:             aggtypes.QUORUM_NUMBERS,
 				QuorumThresholdPercentage: aggtypes.QUORUM_THRESHOLD_NUMERATOR,
@@ -70,7 +70,7 @@ func TestOperator(t *testing.T) {
 		signedTaskResponse := &aggregator.SignedTaskResponse{
 			TaskResponse: cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 				ReferenceTaskIndex: taskIndex,
-				GoldPrice:          big.NewInt(0).Mul(numberToBeSquared, numberToBeSquared),
+				GoldPrice:          big.NewInt(0).Mul(goldPriceTimestamp, goldPriceTimestamp),
 			},
 			BlsSignature: bls.Signature{
 				G1Point: bls.NewG1Point(X, Y),
