@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -309,7 +310,7 @@ func (o *Operator) Start(ctx context.Context) error {
 func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) *cstaskmanager.IOpenOracleTaskManagerTaskResponse {
 	o.logger.Debug("Received new task", "task", newTaskCreatedLog)
 	o.logger.Info("Received new task",
-		"goldPriceTimestamp", newTaskCreatedLog.Task.GoldPriceTimestamp,
+		"metalType", newTaskCreatedLog.Task.MetalType,
 		"taskIndex", newTaskCreatedLog.TaskIndex,
 		"taskCreatedBlock", newTaskCreatedLog.Task.TaskCreatedBlock,
 		"quorumNumbers", newTaskCreatedLog.Task.QuorumNumbers,
@@ -323,7 +324,8 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 	o.logger.Info("Fetching gold price", "price", goldPrice)
 	taskResponse := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 		ReferenceTaskIndex: newTaskCreatedLog.TaskIndex,
-		GoldPrice:          big.NewInt(goldPrice),
+		Price:              big.NewInt(goldPrice),
+		TimeStamp:          big.NewInt(time.Now().Unix()),
 	}
 	return taskResponse
 }

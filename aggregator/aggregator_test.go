@@ -30,7 +30,7 @@ var MOCK_OPERATOR_BLS_PRIVATE_KEY_STRING = "50"
 type MockTask struct {
 	TaskNum        uint32
 	BlockNumber    uint32
-	NumberToSquare uint32
+	NumberToSquare uint8
 }
 
 func TestSendNewTask(t *testing.T) {
@@ -58,8 +58,8 @@ func TestSendNewTask(t *testing.T) {
 
 	var TASK_INDEX = uint32(0)
 	var BLOCK_NUMBER = uint32(100)
-	var NUMBER_TO_SQUARE = uint32(3)
-	var NUMBER_TO_SQUARE_BIG_INT = big.NewInt(int64(NUMBER_TO_SQUARE))
+	var NUMBER_TO_SQUARE = uint8(3)
+	var NUMBER_TO_SQUARE_BIG_INT = uint8(NUMBER_TO_SQUARE)
 
 	mockAvsWriterer.EXPECT().SendNewTaskNumberToSquare(
 		context.Background(), NUMBER_TO_SQUARE_BIG_INT, types.QUORUM_THRESHOLD_NUMERATOR, types.QUORUM_NUMBERS,

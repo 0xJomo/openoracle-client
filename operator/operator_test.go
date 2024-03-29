@@ -27,11 +27,11 @@ func TestOperator(t *testing.T) {
 	const taskIndex = 1
 
 	t.Run("ProcessNewTaskCreatedLog", func(t *testing.T) {
-		var goldPriceTimestamp = big.NewInt(3)
+		var metalType = 1
 		newTaskCreatedLog := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				GoldPriceTimestamp:        goldPriceTimestamp,
+				MetalType:                 uint8(metalType),
 				TaskCreatedBlock:          1000,
 				QuorumNumbers:             aggtypes.QUORUM_NUMBERS,
 				QuorumThresholdPercentage: aggtypes.QUORUM_THRESHOLD_NUMERATOR,
@@ -39,22 +39,23 @@ func TestOperator(t *testing.T) {
 			Raw: types.Log{},
 		}
 		got := operator.ProcessNewTaskCreatedLog(newTaskCreatedLog)
-		goldPrice := big.NewInt(0).Mul(goldPriceTimestamp, goldPriceTimestamp)
+		goldPrice := big.NewInt(1234)
 		want := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 			ReferenceTaskIndex: taskIndex,
-			GoldPrice:          goldPrice,
+			Price:              goldPrice,
+			TimeStamp:          big.NewInt(1234),
 		}
 		assert.Equal(t, got, want)
 	})
 
 	t.Run("Start", func(t *testing.T) {
-		var goldPriceTimestamp = big.NewInt(3)
+		var metalType = 2
 
 		// new task event
 		newTaskCreatedEvent := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				GoldPriceTimestamp:        goldPriceTimestamp,
+				MetalType:                 uint8(metalType),
 				TaskCreatedBlock:          1000,
 				QuorumNumbers:             aggtypes.QUORUM_NUMBERS,
 				QuorumThresholdPercentage: aggtypes.QUORUM_THRESHOLD_NUMERATOR,
@@ -70,7 +71,8 @@ func TestOperator(t *testing.T) {
 		signedTaskResponse := &aggregator.SignedTaskResponse{
 			TaskResponse: cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 				ReferenceTaskIndex: taskIndex,
-				GoldPrice:          big.NewInt(0).Mul(goldPriceTimestamp, goldPriceTimestamp),
+				Price:              big.NewInt(2222),
+				TimeStamp:          big.NewInt(2222),
 			},
 			BlsSignature: bls.Signature{
 				G1Point: bls.NewG1Point(X, Y),

@@ -12,9 +12,9 @@ import (
 
 // ====== TaskManager Mocks ======
 
-func MockSendNewTaskNumberToSquareCall(blockNum, taskNum, numberToSquare uint32) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error) {
+func MockSendNewTaskNumberToSquareCall(blockNum uint32, taskNum uint32, numberToSquare uint8) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error) {
 	task := cstaskmanager.IOpenOracleTaskManagerTask{
-		GoldPriceTimestamp:        big.NewInt(int64(numberToSquare)),
+		MetalType:                 uint8(numberToSquare),
 		TaskCreatedBlock:          blockNum,
 		QuorumNumbers:             types.QUORUM_NUMBERS,
 		QuorumThresholdPercentage: types.QUORUM_THRESHOLD_NUMERATOR,

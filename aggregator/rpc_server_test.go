@@ -63,10 +63,10 @@ func TestProcessSignedTaskResponse(t *testing.T) {
 
 // mocks an operator signing on a task response
 func createMockSignedTaskResponse(mockTask MockTask, keypair bls.KeyPair) (*SignedTaskResponse, error) {
-	numberToSquareBigInt := big.NewInt(int64(mockTask.NumberToSquare))
 	taskResponse := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 		ReferenceTaskIndex: mockTask.TaskNum,
-		GoldPrice:          numberToSquareBigInt.Mul(numberToSquareBigInt, numberToSquareBigInt),
+		Price:              big.NewInt(int64(1234)),
+		TimeStamp:          big.NewInt(int64(1234)),
 	}
 	taskResponseHash, err := core.GetTaskResponseDigest(taskResponse)
 	if err != nil {
