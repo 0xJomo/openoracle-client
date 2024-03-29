@@ -159,6 +159,16 @@ var (
 		Required: true,
 		Usage:    "Load configuration from `FILE`",
 	}
+	OperatorAddressFlag = cli.StringFlag{
+		Name:     "operator-address",
+		Required: true,
+		Usage:    "Operator address",
+	}
+	BlsPrivateKeyStorePathFlag = cli.StringFlag{
+		Name:     "bls-private-key",
+		Required: true,
+		Usage:    "bls private key store path",
+	}
 	CredibleSquaringDeploymentFileFlag = cli.StringFlag{
 		Name:     "credible-squaring-deployment",
 		Required: true,
@@ -175,6 +185,8 @@ var (
 
 var requiredFlags = []cli.Flag{
 	ConfigFileFlag,
+	OperatorAddressFlag,
+	BlsPrivateKeyStorePathFlag,
 	CredibleSquaringDeploymentFileFlag,
 	EcdsaPrivateKeyFlag,
 }

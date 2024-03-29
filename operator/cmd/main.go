@@ -17,7 +17,7 @@ import (
 
 func main() {
 	app := cli.NewApp()
-	app.Flags = []cli.Flag{config.ConfigFileFlag}
+	app.Flags = []cli.Flag{config.ConfigFileFlag, config.OperatorAddressFlag, config.BlsPrivateKeyStorePathFlag, config.EcdsaPrivateKeyFlag}
 	app.Name = "credible-squaring-operator"
 	app.Usage = "Credible Squaring Operator"
 	app.Description = "Service that reads numbers onchain, squares, signs, and sends them to the aggregator."
@@ -38,6 +38,10 @@ func operatorMain(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	nodeConfig.BlsPrivateKeyStorePath = ctx.GlobalString(config.BlsPrivateKeyStorePathFlag.Name)
+	nodeConfig.OperatorAddress = ctx.GlobalString(config.OperatorAddressFlag.Name)
+	nodeConfig.EcdsaPrivateKeyStorePath = ctx.GlobalString(config.EcdsaPrivateKeyFlag.Name)
+
 	configJson, err := json.MarshalIndent(nodeConfig, "", "  ")
 	if err != nil {
 		log.Fatalf(err.Error())
