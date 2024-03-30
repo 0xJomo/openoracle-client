@@ -27,11 +27,11 @@ func TestOperator(t *testing.T) {
 	const taskIndex = 1
 
 	t.Run("ProcessNewTaskCreatedLog", func(t *testing.T) {
-		var metalType = 1
+		var taskType = 1
 		newTaskCreatedLog := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				MetalType:                 uint8(metalType),
+				taskType:                  uint8(taskType),
 				TaskCreatedBlock:          1000,
 				QuorumNumbers:             aggtypes.QUORUM_NUMBERS,
 				QuorumThresholdPercentage: aggtypes.QUORUM_THRESHOLD_NUMERATOR,
@@ -49,13 +49,13 @@ func TestOperator(t *testing.T) {
 	})
 
 	t.Run("Start", func(t *testing.T) {
-		var metalType = 2
+		var taskType = 2
 
 		// new task event
 		newTaskCreatedEvent := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				MetalType:                 uint8(metalType),
+				taskType:                  uint8(taskType),
 				TaskCreatedBlock:          1000,
 				QuorumNumbers:             aggtypes.QUORUM_NUMBERS,
 				QuorumThresholdPercentage: aggtypes.QUORUM_THRESHOLD_NUMERATOR,

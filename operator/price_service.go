@@ -31,7 +31,7 @@ func FetchGoldPrice() (int64, error) {
 	}
 
 	if len(apiResponse) > 0 && len(apiResponse[0].SpreadProfilePrices) > 0 {
-		return int64(apiResponse[0].SpreadProfilePrices[0].Ask), nil
+		return int64(apiResponse[0].SpreadProfilePrices[0].Ask * 100), nil
 	}
 
 	return 0, nil // No data available

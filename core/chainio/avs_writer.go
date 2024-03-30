@@ -20,7 +20,7 @@ type AvsWriterer interface {
 
 	SendNewTaskNumberToSquare(
 		ctx context.Context,
-		metalType uint8,
+		taskType uint8,
 		quorumThresholdPercentage uint32,
 		quorumNumbers []byte,
 	) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error)
@@ -67,13 +67,13 @@ func NewAvsWriter(avsRegistryWriter avsregistry.AvsRegistryWriter, avsServiceBin
 }
 
 // returns the tx receipt, as well as the task index (which it gets from parsing the tx receipt logs)
-func (w *AvsWriter) SendNewTaskNumberToSquare(ctx context.Context, metalType uint8, quorumThresholdPercentage uint32, quorumNumbers []byte) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error) {
+func (w *AvsWriter) SendNewTaskNumberToSquare(ctx context.Context, taskType uint8, quorumThresholdPercentage uint32, quorumNumbers []byte) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error) {
 	txOpts, err := w.TxMgr.GetNoSendTxOpts()
 	if err != nil {
 		w.logger.Errorf("Error getting tx opts")
 		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err
 	}
-	tx, err := w.AvsContractBindings.TaskManager.CreateNewTask(txOpts, metalType, quorumThresholdPercentage, quorumNumbers)
+	tx, err := w.AvsContractBindings.TaskManager.CreateNewTask(txOpts, taskType, quorumThresholdPercentage, quorumNumbers)
 	if err != nil {
 		w.logger.Errorf("Error assembling CreateNewTask tx")
 		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err

@@ -14,7 +14,7 @@ import (
 
 func MockSendNewTaskNumberToSquareCall(blockNum uint32, taskNum uint32, numberToSquare uint8) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error) {
 	task := cstaskmanager.IOpenOracleTaskManagerTask{
-		MetalType:                 uint8(numberToSquare),
+		taskType:                  uint8(numberToSquare),
 		TaskCreatedBlock:          blockNum,
 		QuorumNumbers:             types.QUORUM_NUMBERS,
 		QuorumThresholdPercentage: types.QUORUM_THRESHOLD_NUMERATOR,
