@@ -65,7 +65,7 @@ func TestProcessSignedTaskResponse(t *testing.T) {
 func createMockSignedTaskResponse(mockTask MockTask, keypair bls.KeyPair) (*SignedTaskResponse, error) {
 	taskResponse := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 		ReferenceTaskIndex: mockTask.TaskNum,
-		Price:              big.NewInt(int64(1234)),
+		Result:             big.NewInt(int64(1234)),
 		TimeStamp:          big.NewInt(int64(1234)),
 	}
 	taskResponseHash, err := core.GetTaskResponseDigest(taskResponse)

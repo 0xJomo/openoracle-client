@@ -27,7 +27,7 @@ func main() {
 	app.Version = fmt.Sprintf("%s-%s-%s", Version, GitCommit, GitDate)
 	app.Name = "open-oracle-aggregator"
 	app.Usage = "Open Oracle Aggregator"
-	app.Description = "Service that sends gold price."
+	app.Description = "Service that sends result based on taskType."
 
 	app.Action = aggregatorMain
 	err := app.Run(os.Args)

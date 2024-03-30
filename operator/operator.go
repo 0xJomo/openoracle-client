@@ -324,7 +324,7 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 	o.logger.Info("Fetching gold price", "price", goldPrice)
 	taskResponse := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 		ReferenceTaskIndex: newTaskCreatedLog.TaskIndex,
-		Price:              big.NewInt(goldPrice),
+		Result:             big.NewInt(goldPrice),
 		TimeStamp:          big.NewInt(time.Now().Unix()),
 	}
 	return taskResponse

@@ -31,7 +31,7 @@ func TestOperator(t *testing.T) {
 		newTaskCreatedLog := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				taskType:                  uint8(taskType),
+				TaskType:                  uint8(taskType),
 				TaskCreatedBlock:          1000,
 				QuorumNumbers:             aggtypes.QUORUM_NUMBERS,
 				QuorumThresholdPercentage: aggtypes.QUORUM_THRESHOLD_NUMERATOR,
@@ -42,7 +42,7 @@ func TestOperator(t *testing.T) {
 		goldPrice := big.NewInt(1234)
 		want := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 			ReferenceTaskIndex: taskIndex,
-			Price:              goldPrice,
+			Result:             goldPrice,
 			TimeStamp:          big.NewInt(1234),
 		}
 		assert.Equal(t, got, want)
@@ -55,7 +55,7 @@ func TestOperator(t *testing.T) {
 		newTaskCreatedEvent := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				taskType:                  uint8(taskType),
+				TaskType:                  uint8(taskType),
 				TaskCreatedBlock:          1000,
 				QuorumNumbers:             aggtypes.QUORUM_NUMBERS,
 				QuorumThresholdPercentage: aggtypes.QUORUM_THRESHOLD_NUMERATOR,
@@ -71,7 +71,7 @@ func TestOperator(t *testing.T) {
 		signedTaskResponse := &aggregator.SignedTaskResponse{
 			TaskResponse: cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 				ReferenceTaskIndex: taskIndex,
-				Price:              big.NewInt(2222),
+				Result:             big.NewInt(2222),
 				TimeStamp:          big.NewInt(2222),
 			},
 			BlsSignature: bls.Signature{

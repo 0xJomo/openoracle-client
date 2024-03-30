@@ -21,7 +21,7 @@ func AbiEncodeTaskResponse(h *cstaskmanager.IOpenOracleTaskManagerTaskResponse) 
 			Type: "uint32",
 		},
 		{
-			Name: "price",
+			Name: "result",
 			Type: "uint256",
 		},
 		{
