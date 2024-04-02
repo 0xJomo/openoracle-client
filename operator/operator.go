@@ -2,18 +2,20 @@ package operator
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
-	"math/big"
+	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"avs-oracle/aggregator"
 	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
-	"avs-oracle/core"
 	"avs-oracle/core/chainio"
 	"avs-oracle/metrics"
 	"avs-oracle/types"
@@ -49,6 +51,7 @@ type Operator struct {
 	metricsReg       *prometheus.Registry
 	metrics          metrics.Metrics
 	nodeApi          *nodeapi.NodeApi
+	chainName        string
 	avsWriter        *chainio.AvsWriter
 	avsReader        chainio.AvsReaderer
 	avsSubscriber    chainio.AvsSubscriberer
@@ -206,6 +209,7 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		metrics:                            avsAndEigenMetrics,
 		nodeApi:                            nodeApi,
 		ethClient:                          ethRpcClient,
+		chainName:                          c.ChainName,
 		avsWriter:                          avsWriter,
 		avsReader:                          avsReader,
 		avsSubscriber:                      avsSubscriber,
@@ -293,21 +297,24 @@ func (o *Operator) Start(ctx context.Context) error {
 		case newTaskCreatedLog := <-o.newTaskCreatedChan:
 			o.metrics.IncNumTasksReceived()
 			// TODO: call aggregator API to check if task has received enough response
-			taskResponse := o.ProcessNewTaskCreatedLog(newTaskCreatedLog)
+			taskResponse, err := o.ProcessNewTaskCreatedLog(newTaskCreatedLog)
+			if err != nil {
+				continue
+			}
 			signedTaskResponse, err := o.SignTaskResponse(taskResponse)
 			if err != nil {
 				continue
 			}
 			// TODO: send response to aggregator
 			o.logger.Info("Processed task", "success", signedTaskResponse)
-			// go o.aggregatorRpcClient.SendSignedTaskResponseToAggregator(signedTaskResponse)
+			SendBlsSignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
 		}
 	}
 }
 
 // Takes a NewTaskCreatedLog struct as input and returns a TaskResponseHeader struct.
 // The TaskResponseHeader struct is the struct that is signed and sent to the contract as a task response.
-func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) *cstaskmanager.IOpenOracleTaskManagerTaskResponse {
+func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) (TaskResponse, error) {
 	o.logger.Debug("Received new task", "task", newTaskCreatedLog)
 	o.logger.Info("Received new task",
 		"taskType", newTaskCreatedLog.Task.TaskType,
@@ -319,28 +326,32 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 	goldPrice, error := FetchGoldPrice()
 	if error != nil {
 		o.logger.Error("Fetching gold price", "error", error)
-		goldPrice = 0
+		return TaskResponse{}, error
 	}
-	o.logger.Info("Fetching gold price", "price", goldPrice)
-	taskResponse := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
-		ReferenceTaskIndex: newTaskCreatedLog.TaskIndex,
-		Result:             big.NewInt(goldPrice),
-		TimeStamp:          big.NewInt(time.Now().Unix()),
+
+	taskResponse := TaskResponse{
+		TaskId:    strconv.FormatUint(uint64(newTaskCreatedLog.TaskIndex), 10),
+		Result:    strconv.FormatInt(goldPrice, 10),
+		Timestamp: time.Now().Unix(),
+		ChainName: o.chainName,
 	}
-	return taskResponse
+	return taskResponse, nil
 }
 
-func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskManagerTaskResponse) (*aggregator.SignedTaskResponse, error) {
-	taskResponseHash, err := core.GetTaskResponseDigest(taskResponse)
+func (o *Operator) SignTaskResponse(taskResponse TaskResponse) (SignedTaskResponse, error) {
+	jsonBytes, err := json.Marshal(taskResponse)
 	if err != nil {
-		o.logger.Error("Error getting task response header hash. skipping task (this is not expected and should be investigated)", "err", err)
-		return nil, err
+		log.Fatalf("Error serializing TaskResponse to JSON: %v", err)
+		return SignedTaskResponse{}, err
 	}
+	// Compute SHA-256 hash of the JSON bytes
+	taskResponseHash := sha256.Sum256(jsonBytes)
 	blsSignature := o.blsKeypair.SignMessage(taskResponseHash)
-	signedTaskResponse := &aggregator.SignedTaskResponse{
-		TaskResponse: *taskResponse,
-		BlsSignature: *blsSignature,
-		OperatorId:   o.operatorId,
+	signedTaskResponse := SignedTaskResponse{
+		TaskResponse: taskResponse,
+		Signature:    hex.EncodeToString(blsSignature.Serialize()),
+		OperatorId:   string(o.operatorId[:]),
+		PublicKey:    hex.EncodeToString(o.blsKeypair.PubKey.Serialize()),
 	}
 	o.logger.Debug("Signed task response", "signedTaskResponse", signedTaskResponse)
 	return signedTaskResponse, nil

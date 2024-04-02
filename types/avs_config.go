@@ -9,6 +9,7 @@ type NodeConfig struct {
 	TokenStrategyAddr             string `yaml:"token_strategy_addr"`
 	EthRpcUrl                     string `yaml:"eth_rpc_url"`
 	EthWsUrl                      string `yaml:"eth_ws_url"`
+	ChainName                     string `yaml:"chain_name"`
 	BlsPrivateKeyStorePath        string `yaml:"bls_private_key_store_path"`
 	EcdsaPrivateKeyStorePath      string `yaml:"ecdsa_private_key_store_path"`
 	AggregatorServerIpPortAddress string `yaml:"aggregator_server_ip_port_address"`
