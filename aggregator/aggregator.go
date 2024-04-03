@@ -12,11 +12,7 @@ import (
 	"avs-oracle/core/chainio"
 	"avs-oracle/core/config"
 
-	"github.com/Layr-Labs/eigensdk-go/chainio/clients"
-	sdkclients "github.com/Layr-Labs/eigensdk-go/chainio/clients"
-	"github.com/Layr-Labs/eigensdk-go/services/avsregistry"
 	blsagg "github.com/Layr-Labs/eigensdk-go/services/bls_aggregation"
-	oppubkeysserv "github.com/Layr-Labs/eigensdk-go/services/operatorpubkeys"
 	sdktypes "github.com/Layr-Labs/eigensdk-go/types"
 
 	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
@@ -79,11 +75,11 @@ type Aggregator struct {
 // NewAggregator creates a new Aggregator with the provided config.
 func NewAggregator(c *config.Config) (*Aggregator, error) {
 
-	avsReader, err := chainio.BuildAvsReaderFromConfig(c)
-	if err != nil {
-		c.Logger.Error("Cannot create avsReader", "err", err)
-		return nil, err
-	}
+	// avsReader, err := chainio.BuildAvsReaderFromConfig(c)
+	// if err != nil {
+	// 	c.Logger.Error("Cannot create avsReader", "err", err)
+	// 	return nil, err
+	// }
 
 	avsWriter, err := chainio.BuildAvsWriterFromConfig(c)
 	if err != nil {
@@ -91,29 +87,29 @@ func NewAggregator(c *config.Config) (*Aggregator, error) {
 		return nil, err
 	}
 
-	chainioConfig := sdkclients.BuildAllConfig{
-		EthHttpUrl:                 c.EthHttpRpcUrl,
-		EthWsUrl:                   c.EthWsRpcUrl,
-		RegistryCoordinatorAddr:    c.OpenOracleRegistryCoordinatorAddr.String(),
-		OperatorStateRetrieverAddr: c.OperatorStateRetrieverAddr.String(),
-		AvsName:                    avsName,
-		PromMetricsIpPortAddress:   ":9090",
-	}
-	clients, err := clients.BuildAll(chainioConfig, c.AggregatorAddress, c.SignerFn, c.Logger)
+	// chainioConfig := sdkclients.BuildAllConfig{
+	// 	EthHttpUrl:                 c.EthHttpRpcUrl,
+	// 	EthWsUrl:                   c.EthWsRpcUrl,
+	// 	RegistryCoordinatorAddr:    c.OpenOracleRegistryCoordinatorAddr.String(),
+	// 	OperatorStateRetrieverAddr: c.OperatorStateRetrieverAddr.String(),
+	// 	AvsName:                    avsName,
+	// 	PromMetricsIpPortAddress:   ":9090",
+	// }
+	// clients, err := clients.BuildAll(chainioConfig, c.SignerFn, c.Logger)
 	if err != nil {
 		c.Logger.Errorf("Cannot create sdk clients", "err", err)
 		return nil, err
 	}
 
-	operatorPubkeysService := oppubkeysserv.NewOperatorPubkeysServiceInMemory(context.Background(), clients.AvsRegistryChainSubscriber, clients.AvsRegistryChainReader, c.Logger)
-	avsRegistryService := avsregistry.NewAvsRegistryServiceChainCaller(avsReader, operatorPubkeysService, c.Logger)
-	blsAggregationService := blsagg.NewBlsAggregatorService(avsRegistryService, c.Logger)
+	// operatorPubkeysService := oppubkeysserv.NewOperatorPubkeysServiceInMemory(context.Background(), clients.AvsRegistryChainSubscriber, clients.AvsRegistryChainReader, c.Logger)
+	// avsRegistryService := avsregistry.NewAvsRegistryServiceChainCaller(avsReader, operatorPubkeysService, c.Logger)
+	// blsAggregationService := blsagg.NewBlsAggregatorService(avsRegistryService, c.Logger)
 
 	return &Aggregator{
 		logger:                c.Logger,
 		serverIpPortAddr:      c.AggregatorServerIpPortAddr,
 		avsWriter:             avsWriter,
-		blsAggregationService: blsAggregationService,
+		blsAggregationService: nil,
 		tasks:                 make(map[types.TaskIndex]cstaskmanager.IOpenOracleTaskManagerTask),
 		taskResponses:         make(map[types.TaskIndex]map[sdktypes.TaskResponseDigest]cstaskmanager.IOpenOracleTaskManagerTaskResponse),
 	}, nil
@@ -214,7 +210,7 @@ func (agg *Aggregator) sendNewTask(taskType uint8) error {
 	}
 	// TODO(samlaf): we use seconds for now, but we should ideally pass a blocknumber to the blsAggregationService
 	// and it should monitor the chain and only expire the task aggregation once the chain has reached that block number.
-	taskTimeToExpiry := taskChallengeWindowBlock * blockTimeSeconds
-	agg.blsAggregationService.InitializeNewTask(taskIndex, newTask.TaskCreatedBlock, newTask.QuorumNumbers, quorumThresholdPercentages, taskTimeToExpiry)
+	// taskTimeToExpiry := taskChallengeWindowBlock * blockTimeSeconds
+	// agg.blsAggregationService.InitializeNewTask(taskIndex, newTask.TaskCreatedBlock, newTask.QuorumNumbers, quorumThresholdPercentages, taskTimeToExpiry)
 	return nil
 }

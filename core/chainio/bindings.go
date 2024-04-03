@@ -18,11 +18,11 @@ import (
 type AvsManagersBindings struct {
 	TaskManager    *cstaskmanager.ContractOpenOracleTaskManager
 	ServiceManager *csservicemanager.ContractOpenOracleServiceManager
-	ethClient      eth.EthClient
+	ethClient      eth.Client
 	logger         logging.Logger
 }
 
-func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr gethcommon.Address, ethclient eth.EthClient, logger logging.Logger) (*AvsManagersBindings, error) {
+func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr gethcommon.Address, ethclient eth.Client, logger logging.Logger) (*AvsManagersBindings, error) {
 	contractRegistryCoordinator, err := regcoord.NewContractRegistryCoordinator(registryCoordinatorAddr, ethclient)
 	if err != nil {
 		return nil, err

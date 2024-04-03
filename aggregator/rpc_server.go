@@ -10,6 +10,7 @@ import (
 	"avs-oracle/core"
 
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	"github.com/Layr-Labs/eigensdk-go/types"
 	sdktypes "github.com/Layr-Labs/eigensdk-go/types"
 )
 
@@ -40,7 +41,7 @@ func (agg *Aggregator) startServer(ctx context.Context) error {
 type SignedTaskResponse struct {
 	TaskResponse cstaskmanager.IOpenOracleTaskManagerTaskResponse
 	BlsSignature bls.Signature
-	OperatorId   bls.OperatorId
+	OperatorId   types.OperatorId
 }
 
 // rpc endpoint which is called by operator

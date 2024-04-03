@@ -11,6 +11,7 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/eth"
+	"github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/chainio/txmgr"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	sdklogging "github.com/Layr-Labs/eigensdk-go/logging"
@@ -30,8 +31,7 @@ type Config struct {
 	// only take an ethclient or an rpcUrl (and build the ethclient at each constructor site)
 	EthHttpRpcUrl                     string
 	EthWsRpcUrl                       string
-	EthHttpClient                     eth.EthClient
-	EthWsClient                       eth.EthClient
+	EthHttpClient                     eth.Client
 	OperatorStateRetrieverAddr        common.Address
 	OpenOracleRegistryCoordinatorAddr common.Address
 	AggregatorServerIpPortAddr        string
@@ -89,12 +89,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 
-	ethWsClient, err := eth.NewClient(configRaw.EthWsUrl)
-	if err != nil {
-		logger.Errorf("Cannot create ws ethclient", "err", err)
-		return nil, err
-	}
-
 	ecdsaPrivateKeyString := ctx.GlobalString(EcdsaPrivateKeyFlag.Name)
 	if ecdsaPrivateKeyString[:2] == "0x" {
 		ecdsaPrivateKeyString = ecdsaPrivateKeyString[2:]
@@ -121,7 +115,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	if err != nil {
 		panic(err)
 	}
-	txMgr := txmgr.NewSimpleTxManager(ethRpcClient, logger, signerV2, aggregatorAddr)
+	wallet, err := wallet.NewPrivateKeyWallet(ethRpcClient, signerV2, aggregatorAddr, logger)
+	txMgr := txmgr.NewSimpleTxManager(wallet, ethRpcClient, logger, aggregatorAddr)
 
 	config := &Config{
 		EcdsaPrivateKey:                   ecdsaPrivateKey,
@@ -129,7 +124,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EthWsRpcUrl:                       configRaw.EthWsUrl,
 		EthHttpRpcUrl:                     configRaw.EthRpcUrl,
 		EthHttpClient:                     ethRpcClient,
-		EthWsClient:                       ethWsClient,
 		OperatorStateRetrieverAddr:        common.HexToAddress(credibleSquaringDeploymentRaw.Addresses.OperatorStateRetrieverAddr),
 		OpenOracleRegistryCoordinatorAddr: common.HexToAddress(credibleSquaringDeploymentRaw.Addresses.RegistryCoordinatorAddr),
 		AggregatorServerIpPortAddr:        configRaw.AggregatorServerIpPortAddr,
