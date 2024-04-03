@@ -35,12 +35,12 @@ func (o *Operator) registerOperatorOnStartup(
 	}
 
 	// TODO(samlaf): shouldn't hardcode number here
-	amount := big.NewInt(10)
-	err = o.DepositIntoStrategy(mockTokenStrategyAddr, amount)
-	if err != nil {
-		o.logger.Fatal("Error depositing into strategy", "err", err)
-	}
-	o.logger.Infof("Deposited %s into strategy %s", amount, mockTokenStrategyAddr)
+	// amount := big.NewInt(10)
+	// err = o.DepositIntoStrategy(mockTokenStrategyAddr, amount)
+	// if err != nil {
+	// 	o.logger.Fatal("Error depositing into strategy", "err", err)
+	// }
+	// o.logger.Infof("Deposited %s into strategy %s", amount, mockTokenStrategyAddr)
 
 	err = o.RegisterOperatorWithAvs(operatorEcdsaPrivateKey)
 	if err != nil {
