@@ -8,6 +8,7 @@ package operator
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -24,7 +25,6 @@ import (
 
 func (o *Operator) registerOperatorOnStartup(
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
-	mockTokenStrategyAddr common.Address,
 ) {
 	err := o.RegisterOperatorWithEigenlayer()
 	if err != nil {
@@ -34,17 +34,9 @@ func (o *Operator) registerOperatorOnStartup(
 		o.logger.Infof("Registered operator with eigenlayer")
 	}
 
-	// TODO(samlaf): shouldn't hardcode number here
-	// amount := big.NewInt(10)
-	// err = o.DepositIntoStrategy(mockTokenStrategyAddr, amount)
-	// if err != nil {
-	// 	o.logger.Fatal("Error depositing into strategy", "err", err)
-	// }
-	// o.logger.Infof("Deposited %s into strategy %s", amount, mockTokenStrategyAddr)
-
 	err = o.RegisterOperatorWithAvs(operatorEcdsaPrivateKey)
 	if err != nil {
-		o.logger.Fatal("Error registering operator with avs", "err", err)
+		o.logger.Error("Error registering operator with avs", "err", err)
 	}
 	o.logger.Infof("Registered operator with avs")
 }
@@ -56,8 +48,7 @@ func (o *Operator) RegisterOperatorWithEigenlayer() error {
 	}
 	_, err := o.eigenlayerWriter.RegisterAsOperator(context.Background(), op)
 	if err != nil {
-		o.logger.Errorf("Error registering operator with eigenlayer")
-		return err
+		o.logger.Errorf("Error registering operator with eigenlayer", "err", err)
 	}
 	return nil
 }
@@ -100,7 +91,9 @@ func (o *Operator) RegisterOperatorWithAvs(
 	// hardcode these things for now
 	quorumNumbers := []eigenSdkTypes.QuorumNum{0}
 	socket := "Not Needed"
-	operatorToAvsRegistrationSigSalt := [32]byte{123}
+	salt := make([]byte, 32)
+	rand.Read((salt))
+	operatorToAvsRegistrationSigSalt := [32]byte(salt)
 	curBlockNum, err := o.ethClient.BlockNumber(context.Background())
 	if err != nil {
 		o.logger.Errorf("Unable to get current block number")
@@ -172,6 +165,22 @@ func (o *Operator) PrintOperatorStatus() error {
 		return err
 	}
 	fmt.Println(string(operatorStatusJson))
+	return nil
+}
+
+func (o *Operator) UpdateOperator() error {
+	_, err := o.avsReader.GetOperatorId(&bind.CallOpts{}, o.operatorAddr)
+	if err != nil {
+		return err
+	}
+
+	_, err = o.avsWriter.UpdateStakesOfOperatorSubsetForAllQuorums(
+		context.Background(),
+		[]common.Address{o.operatorAddr},
+	)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
