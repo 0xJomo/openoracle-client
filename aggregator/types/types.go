@@ -10,6 +10,9 @@ import (
 const QUORUM_THRESHOLD_NUMERATOR = uint32(100)
 const QUORUM_THRESHOLD_DENOMINATOR = uint32(100)
 
+const RESPONDER_NUMBER = uint8(5)
+const STAKE_THRESHOLD = 1
+
 const QUERY_FILTER_FROM_BLOCK = uint64(1)
 
 // we only use a single quorum (quorum 0) for open oracle

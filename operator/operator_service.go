@@ -14,20 +14,19 @@ type ApiResponse struct {
 }
 
 type TaskResponse struct {
-	ChainName string `json:"chainName"`
 	TaskId    string `json:"taskId"`
 	Result    string `json:"result"`
 	Timestamp int64  `json:"timestamp"`
 }
 
 type SignedTaskResponse struct {
-	OperatorId   string       `json:"operatorId"`
-	TaskResponse TaskResponse `json:"taskResponse"`
-	PublicKey    string       `json:"publicKey"`
-	Signature    string       `json:"signature"`
+	ChainName       string       `json:"chainName"`
+	TaskResponse    TaskResponse `json:"taskResponse"`
+	OperatorAddress string       `json:"operatorAddress"`
+	Signature       string       `json:"signature"`
 }
 
-func SendBlsSignedRequest(payload SignedTaskResponse, url string) error {
+func SendECDSASignedRequest(payload SignedTaskResponse, url string) error {
 
 	// Serialize the payload to JSON
 	payloadBytes, err := json.Marshal(payload)

@@ -2,6 +2,7 @@ package aggregator
 
 import (
 	"context"
+	"math/big"
 	"sync"
 	"time"
 
@@ -194,7 +195,7 @@ func (agg *Aggregator) sendAggregatedResponseToContract(blsAggServiceResp blsagg
 func (agg *Aggregator) sendNewTask(taskType uint8) error {
 	agg.logger.Info("Aggregator sending new task", "numberToSquare", taskType)
 	// Send number to square to the task manager contract
-	newTask, taskIndex, err := agg.avsWriter.SendNewTaskNumberToSquare(context.Background(), taskType, types.QUORUM_THRESHOLD_NUMERATOR, types.QUORUM_NUMBERS)
+	newTask, taskIndex, err := agg.avsWriter.SendNewTaskNumberToSquare(context.Background(), taskType, types.RESPONDER_NUMBER, big.NewInt(types.STAKE_THRESHOLD))
 	if err != nil {
 		agg.logger.Error("Aggregator failed to send number to square", "err", err)
 		return err
@@ -204,10 +205,6 @@ func (agg *Aggregator) sendNewTask(taskType uint8) error {
 	agg.tasks[taskIndex] = newTask
 	agg.tasksMu.Unlock()
 
-	quorumThresholdPercentages := make([]uint32, len(newTask.QuorumNumbers))
-	for i, _ := range newTask.QuorumNumbers {
-		quorumThresholdPercentages[i] = newTask.QuorumThresholdPercentage
-	}
 	// TODO(samlaf): we use seconds for now, but we should ideally pass a blocknumber to the blsAggregationService
 	// and it should monitor the chain and only expire the task aggregation once the chain has reached that block number.
 	// taskTimeToExpiry := taskChallengeWindowBlock * blockTimeSeconds

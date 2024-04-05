@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	cryptoecdsa "crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -60,6 +61,7 @@ type Operator struct {
 	eigenlayerReader sdkelcontracts.ELReader
 	eigenlayerWriter sdkelcontracts.ELWriter
 	blsKeypair       *bls.KeyPair
+	ecdsaKey         *cryptoecdsa.PrivateKey
 	operatorId       sdktypes.OperatorId
 	operatorAddr     common.Address
 	// receive new tasks in this chan (typically from listening to onchain event)
@@ -220,6 +222,7 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		eigenlayerReader:                   sdkClients.ElChainReader,
 		eigenlayerWriter:                   sdkClients.ElChainWriter,
 		blsKeypair:                         blsKeyPair,
+		ecdsaKey:                           ecdsaKey,
 		operatorAddr:                       common.HexToAddress(c.OperatorAddress),
 		aggregatorServerIpPortAddr:         c.AggregatorServerIpPortAddress,
 		aggregatorRpcClient:                aggregatorRpcClient,
@@ -311,7 +314,7 @@ func (o *Operator) Start(ctx context.Context) error {
 			}
 			// TODO: send response to aggregator
 			o.logger.Info("Processed task", "success", signedTaskResponse)
-			SendBlsSignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
+			SendECDSASignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
 		}
 	}
 }
@@ -324,8 +327,8 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 		"taskType", newTaskCreatedLog.Task.TaskType,
 		"taskIndex", newTaskCreatedLog.TaskIndex,
 		"taskCreatedBlock", newTaskCreatedLog.Task.TaskCreatedBlock,
-		"quorumNumbers", newTaskCreatedLog.Task.QuorumNumbers,
-		"QuorumThresholdPercentage", newTaskCreatedLog.Task.QuorumThresholdPercentage,
+		"responderNumber", newTaskCreatedLog.Task.ResponderNumber,
+		"stakeThreshold", newTaskCreatedLog.Task.StakeThreshold,
 		"creator", newTaskCreatedLog.Task.Creator,
 		"creationFee", newTaskCreatedLog.Task.CreationFee,
 	)
@@ -340,7 +343,6 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 		TaskId:    strconv.FormatUint(uint64(newTaskCreatedLog.TaskIndex), 10),
 		Result:    strconv.FormatInt(goldPrice, 10),
 		Timestamp: time.Now().Unix(),
-		ChainName: o.chainName,
 	}
 	return taskResponse, nil
 }
@@ -353,14 +355,24 @@ func (o *Operator) SignTaskResponse(taskResponse TaskResponse) (SignedTaskRespon
 	}
 	// Compute SHA-256 hash of the JSON bytes
 	taskResponseHash := crypto.Keccak256Hash(jsonBytes)
-	// log.Fatalf("Error serializing TaskResponse to JSON: %v", taskResponse, taskResponseHash)
-	blsSignature := o.blsKeypair.SignMessage(taskResponseHash)
-	signedTaskResponse := SignedTaskResponse{
-		TaskResponse: taskResponse,
-		Signature:    hex.EncodeToString(blsSignature.Serialize()),
-		OperatorId:   string(o.operatorId[:]),
-		PublicKey:    hex.EncodeToString(o.blsKeypair.PubKey.Serialize()),
+	// Sign the hash using the operator's ECDSA private key
+	signature, err := crypto.Sign(taskResponseHash.Bytes(), o.ecdsaKey)
+	if err != nil {
+		log.Fatalf("Error signing task response: %v", err)
+		return SignedTaskResponse{}, err
 	}
-	o.logger.Debug("Signed task response", "signedTaskResponse", signedTaskResponse)
+	if err != nil {
+		log.Fatalf("Error signing task response: %v", err)
+		return SignedTaskResponse{}, err
+	}
+	signedTaskResponse := SignedTaskResponse{
+		TaskResponse:    taskResponse,
+		Signature:       hex.EncodeToString(signature),
+		ChainName:       o.chainName,
+		OperatorAddress: o.config.OperatorAddress,
+	}
+	o.logger.Info("Signed task response", "taskResponse", taskResponse)
+	o.logger.Info("Signed task response", "taskResponseHash", taskResponseHash)
+	o.logger.Info("Signed task response", "signedTaskResponse", signedTaskResponse)
 	return signedTaskResponse, nil
 }
