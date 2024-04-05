@@ -96,20 +96,20 @@ func (w *AvsWriter) SendAggregatedResponse(
 	taskResponse cstaskmanager.IOpenOracleTaskManagerTaskResponse,
 	nonSignerStakesAndSignature cstaskmanager.IBLSSignatureCheckerNonSignerStakesAndSignature,
 ) (*types.Receipt, error) {
-	txOpts, err := w.TxMgr.GetNoSendTxOpts()
-	if err != nil {
-		w.logger.Errorf("Error getting tx opts")
-		return nil, err
-	}
-	tx, err := w.AvsContractBindings.TaskManager.RespondToTask(txOpts, task, taskResponse, nonSignerStakesAndSignature)
-	if err != nil {
-		w.logger.Error("Error submitting SubmitTaskResponse tx while calling respondToTask", "err", err)
-		return nil, err
-	}
-	receipt, err := w.TxMgr.Send(ctx, tx)
-	if err != nil {
-		w.logger.Errorf("Error submitting CreateNewTask tx")
-		return nil, err
-	}
-	return receipt, nil
+	// txOpts, err := w.TxMgr.GetNoSendTxOpts()
+	// if err != nil {
+	// 	w.logger.Errorf("Error getting tx opts")
+	// 	return nil, err
+	// }
+	// tx, err := w.AvsContractBindings.TaskManager.RespondToTask(txOpts, task, taskResponse, nSignerStakesAndSignature)
+	// if err != nil {
+	// 	w.logger.Error("Error submitting SubmitTaskResponse tx while calling respondToTask", "err", err)
+	// 	return nil, err
+	// }
+	// receipt, err := w.TxMgr.Send(ctx, tx)
+	// if err != nil {
+	// 	w.logger.Errorf("Error submitting CreateNewTask tx")
+	// 	return nil, err
+	// }
+	return nil, nil
 }

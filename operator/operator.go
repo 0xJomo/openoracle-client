@@ -2,7 +2,6 @@ package operator
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 
 	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
@@ -326,7 +326,10 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 		"taskCreatedBlock", newTaskCreatedLog.Task.TaskCreatedBlock,
 		"quorumNumbers", newTaskCreatedLog.Task.QuorumNumbers,
 		"QuorumThresholdPercentage", newTaskCreatedLog.Task.QuorumThresholdPercentage,
+		"creator", newTaskCreatedLog.Task.Creator,
+		"creationFee", newTaskCreatedLog.Task.CreationFee,
 	)
+
 	goldPrice, error := FetchGoldPrice()
 	if error != nil {
 		o.logger.Error("Fetching gold price", "error", error)
@@ -349,7 +352,8 @@ func (o *Operator) SignTaskResponse(taskResponse TaskResponse) (SignedTaskRespon
 		return SignedTaskResponse{}, err
 	}
 	// Compute SHA-256 hash of the JSON bytes
-	taskResponseHash := sha256.Sum256(jsonBytes)
+	taskResponseHash := crypto.Keccak256Hash(jsonBytes)
+	// log.Fatalf("Error serializing TaskResponse to JSON: %v", taskResponse, taskResponseHash)
 	blsSignature := o.blsKeypair.SignMessage(taskResponseHash)
 	signedTaskResponse := SignedTaskResponse{
 		TaskResponse: taskResponse,
