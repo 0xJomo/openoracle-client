@@ -3,12 +3,10 @@ package operator
 import (
 	"context"
 	cryptoecdsa "crypto/ecdsa"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -17,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
+	"avs-oracle/core"
 	"avs-oracle/core/chainio"
 	"avs-oracle/metrics"
 	"avs-oracle/types"
@@ -27,7 +26,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/chainio/txmgr"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
-	"github.com/Layr-Labs/eigensdk-go/crypto/ecdsa"
 	sdkecdsa "github.com/Layr-Labs/eigensdk-go/crypto/ecdsa"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	sdklogging "github.com/Layr-Labs/eigensdk-go/logging"
@@ -144,7 +142,10 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		logger.Warnf("OPERATOR_ECDSA_KEY_PASSWORD env var not set. using empty string")
 	}
 
-	ecdsaKey, err := ecdsa.ReadKey(c.EcdsaPrivateKeyStorePath, ecdsaKeyPassword)
+	ecdsaKey, err := sdkecdsa.ReadKey(
+		c.EcdsaPrivateKeyStorePath,
+		ecdsaKeyPassword,
+	)
 	signerV2, _, err := signerv2.SignerFromConfig(signerv2.Config{
 		KeystorePath: c.EcdsaPrivateKeyStorePath,
 		Password:     ecdsaKeyPassword,
@@ -321,7 +322,7 @@ func (o *Operator) Start(ctx context.Context) error {
 
 // Takes a NewTaskCreatedLog struct as input and returns a TaskResponseHeader struct.
 // The TaskResponseHeader struct is the struct that is signed and sent to the contract as a task response.
-func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) (TaskResponse, error) {
+func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) (*cstaskmanager.IOpenOracleTaskManagerTaskResponse, error) {
 	o.logger.Debug("Received new task", "task", newTaskCreatedLog)
 	o.logger.Info("Received new task",
 		"taskType", newTaskCreatedLog.Task.TaskType,
@@ -336,27 +337,25 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 	goldPrice, error := FetchGoldPrice()
 	if error != nil {
 		o.logger.Error("Fetching gold price", "error", error)
-		return TaskResponse{}, error
+		return nil, error
 	}
 
-	taskResponse := TaskResponse{
-		TaskId:    strconv.FormatUint(uint64(newTaskCreatedLog.TaskIndex), 10),
-		Result:    strconv.FormatInt(goldPrice, 10),
-		Timestamp: time.Now().Unix(),
+	taskResponse := cstaskmanager.IOpenOracleTaskManagerTaskResponse{
+		ReferenceTaskIndex: newTaskCreatedLog.TaskIndex,
+		Result:             big.NewInt(goldPrice),
+		TimeStamp:          big.NewInt(time.Now().Unix()),
 	}
-	return taskResponse, nil
+	return &taskResponse, nil
 }
 
-func (o *Operator) SignTaskResponse(taskResponse TaskResponse) (SignedTaskResponse, error) {
-	jsonBytes, err := json.Marshal(taskResponse)
+func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskManagerTaskResponse) (SignedTaskResponse, error) {
+	taskResponseHash, err := core.GetTaskResponseDigest(taskResponse)
 	if err != nil {
 		log.Fatalf("Error serializing TaskResponse to JSON: %v", err)
 		return SignedTaskResponse{}, err
 	}
-	// Compute SHA-256 hash of the JSON bytes
-	taskResponseHash := crypto.Keccak256Hash(jsonBytes)
 	// Sign the hash using the operator's ECDSA private key
-	signature, err := crypto.Sign(taskResponseHash.Bytes(), o.ecdsaKey)
+	signature, err := crypto.Sign(taskResponseHash[:], o.ecdsaKey)
 	if err != nil {
 		log.Fatalf("Error signing task response: %v", err)
 		return SignedTaskResponse{}, err
@@ -367,10 +366,12 @@ func (o *Operator) SignTaskResponse(taskResponse TaskResponse) (SignedTaskRespon
 	}
 	signedTaskResponse := SignedTaskResponse{
 		TaskResponse:    taskResponse,
-		Signature:       hex.EncodeToString(signature),
+		Signature:       signature,
 		ChainName:       o.chainName,
 		OperatorAddress: o.config.OperatorAddress,
 	}
+	o.logger.Info("Signed task response", "parse", crypto.VerifySignature(o.operatorAddr[:], taskResponseHash[:], signature))
+	o.logger.Info("Signed task response", "signature", signature)
 	o.logger.Info("Signed task response", "taskResponse", taskResponse)
 	o.logger.Info("Signed task response", "taskResponseHash", taskResponseHash)
 	o.logger.Info("Signed task response", "signedTaskResponse", signedTaskResponse)

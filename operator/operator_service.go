@@ -1,6 +1,7 @@
 package operator
 
 import (
+	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
@@ -13,17 +14,11 @@ type ApiResponse struct {
 	} `json:"spreadProfilePrices"`
 }
 
-type TaskResponse struct {
-	TaskId    string `json:"taskId"`
-	Result    string `json:"result"`
-	Timestamp int64  `json:"timestamp"`
-}
-
 type SignedTaskResponse struct {
-	ChainName       string       `json:"chainName"`
-	TaskResponse    TaskResponse `json:"taskResponse"`
-	OperatorAddress string       `json:"operatorAddress"`
-	Signature       string       `json:"signature"`
+	ChainName       string                                            `json:"chainName"`
+	TaskResponse    *cstaskmanager.IOpenOracleTaskManagerTaskResponse `json:"taskResponse"`
+	OperatorAddress string                                            `json:"operatorAddress"`
+	Signature       []byte                                            `json:"signature"`
 }
 
 func SendECDSASignedRequest(payload SignedTaskResponse, url string) error {
