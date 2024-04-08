@@ -31,14 +31,14 @@ func TestOperator(t *testing.T) {
 		newTaskCreatedLog := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				TaskType:                  uint8(taskType),
-				TaskCreatedBlock:          1000,
-				QuorumNumbers:             aggtypes.QUORUM_NUMBERS,
-				QuorumThresholdPercentage: aggtypes.QUORUM_THRESHOLD_NUMERATOR,
+				TaskType:         uint8(taskType),
+				TaskCreatedBlock: 1000,
+				StakeThreshold:   big.NewInt(aggtypes.STAKE_THRESHOLD),
+				ResponderNumber:  aggtypes.RESPONDER_NUMBER,
 			},
 			Raw: types.Log{},
 		}
-		got := operator.ProcessNewTaskCreatedLog(newTaskCreatedLog)
+		got, _ := operator.ProcessNewTaskCreatedLog(newTaskCreatedLog)
 		goldPrice := big.NewInt(1234)
 		want := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 			ReferenceTaskIndex: taskIndex,
@@ -55,10 +55,10 @@ func TestOperator(t *testing.T) {
 		newTaskCreatedEvent := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				TaskType:                  uint8(taskType),
-				TaskCreatedBlock:          1000,
-				QuorumNumbers:             aggtypes.QUORUM_NUMBERS,
-				QuorumThresholdPercentage: aggtypes.QUORUM_THRESHOLD_NUMERATOR,
+				TaskType:         uint8(taskType),
+				TaskCreatedBlock: 1000,
+				StakeThreshold:   big.NewInt(aggtypes.STAKE_THRESHOLD),
+				ResponderNumber:  aggtypes.RESPONDER_NUMBER,
 			},
 			Raw: types.Log{},
 		}

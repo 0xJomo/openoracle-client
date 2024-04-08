@@ -2,20 +2,21 @@ package operator
 
 import (
 	"context"
-	"crypto/sha256"
+	cryptoecdsa "crypto/ecdsa"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 
 	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
+	"avs-oracle/core"
 	"avs-oracle/core/chainio"
 	"avs-oracle/metrics"
 	"avs-oracle/types"
@@ -60,6 +61,7 @@ type Operator struct {
 	eigenlayerReader sdkelcontracts.ELReader
 	eigenlayerWriter sdkelcontracts.ELWriter
 	blsKeypair       *bls.KeyPair
+	ecdsaKey         *cryptoecdsa.PrivateKey
 	operatorId       sdktypes.OperatorId
 	operatorAddr     common.Address
 	// receive new tasks in this chan (typically from listening to onchain event)
@@ -220,6 +222,7 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		eigenlayerReader:                   sdkClients.ElChainReader,
 		eigenlayerWriter:                   sdkClients.ElChainWriter,
 		blsKeypair:                         blsKeyPair,
+		ecdsaKey:                           ecdsaKey,
 		operatorAddr:                       common.HexToAddress(c.OperatorAddress),
 		aggregatorServerIpPortAddr:         c.AggregatorServerIpPortAddress,
 		aggregatorRpcClient:                aggregatorRpcClient,
@@ -311,52 +314,71 @@ func (o *Operator) Start(ctx context.Context) error {
 			}
 			// TODO: send response to aggregator
 			o.logger.Info("Processed task", "success", signedTaskResponse)
-			SendBlsSignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
+			SendECDSASignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
 		}
 	}
 }
 
 // Takes a NewTaskCreatedLog struct as input and returns a TaskResponseHeader struct.
 // The TaskResponseHeader struct is the struct that is signed and sent to the contract as a task response.
-func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) (TaskResponse, error) {
+func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) (*cstaskmanager.IOpenOracleTaskManagerTaskResponse, error) {
 	o.logger.Debug("Received new task", "task", newTaskCreatedLog)
 	o.logger.Info("Received new task",
 		"taskType", newTaskCreatedLog.Task.TaskType,
 		"taskIndex", newTaskCreatedLog.TaskIndex,
 		"taskCreatedBlock", newTaskCreatedLog.Task.TaskCreatedBlock,
-		"quorumNumbers", newTaskCreatedLog.Task.QuorumNumbers,
-		"QuorumThresholdPercentage", newTaskCreatedLog.Task.QuorumThresholdPercentage,
+		"responderNumber", newTaskCreatedLog.Task.ResponderNumber,
+		"stakeThreshold", newTaskCreatedLog.Task.StakeThreshold,
+		"creator", newTaskCreatedLog.Task.Creator,
+		"creationFee", newTaskCreatedLog.Task.CreationFee,
 	)
+
 	goldPrice, error := FetchGoldPrice()
 	if error != nil {
 		o.logger.Error("Fetching gold price", "error", error)
-		return TaskResponse{}, error
+		return nil, error
 	}
 
-	taskResponse := TaskResponse{
-		TaskId:    strconv.FormatUint(uint64(newTaskCreatedLog.TaskIndex), 10),
-		Result:    strconv.FormatInt(goldPrice, 10),
-		Timestamp: time.Now().Unix(),
-		ChainName: o.chainName,
+	taskResponse := cstaskmanager.IOpenOracleTaskManagerTaskResponse{
+		ReferenceTaskIndex: newTaskCreatedLog.TaskIndex,
+		Result:             big.NewInt(goldPrice),
+		TimeStamp:          big.NewInt(time.Now().Unix()),
 	}
-	return taskResponse, nil
+	return &taskResponse, nil
 }
 
-func (o *Operator) SignTaskResponse(taskResponse TaskResponse) (SignedTaskResponse, error) {
-	jsonBytes, err := json.Marshal(taskResponse)
+func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskManagerTaskResponse) (SignedTaskResponse, error) {
+	taskResponseHash, err := core.GetTaskResponseDigest(taskResponse)
 	if err != nil {
 		log.Fatalf("Error serializing TaskResponse to JSON: %v", err)
 		return SignedTaskResponse{}, err
 	}
-	// Compute SHA-256 hash of the JSON bytes
-	taskResponseHash := sha256.Sum256(jsonBytes)
-	blsSignature := o.blsKeypair.SignMessage(taskResponseHash)
-	signedTaskResponse := SignedTaskResponse{
-		TaskResponse: taskResponse,
-		Signature:    hex.EncodeToString(blsSignature.Serialize()),
-		OperatorId:   string(o.operatorId[:]),
-		PublicKey:    hex.EncodeToString(o.blsKeypair.PubKey.Serialize()),
+	prefixedHash := crypto.Keccak256Hash([]byte(fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(taskResponseHash), taskResponseHash)))
+	// Sign the hash using the operator's ECDSA private key
+	signature, err := crypto.Sign(prefixedHash[:], o.ecdsaKey)
+	// Adjust 'v' value; Ethereum expects 'v' to be 27 or 28
+	// Go's crypto.Sign returns 'v' as 0 or 1, so we adjust it by adding 27
+	if signature[64] < 27 {
+		signature[64] += 27
 	}
+	o.logger.Info("Signed task response", "signature64", signature[64])
+	if err != nil {
+		log.Fatalf("Error signing task response: %v", err)
+		return SignedTaskResponse{}, err
+	}
+	if err != nil {
+		log.Fatalf("Error signing task response: %v", err)
+		return SignedTaskResponse{}, err
+	}
+	signedTaskResponse := SignedTaskResponse{
+		TaskResponse:    taskResponse,
+		Signature:       "0x" + hex.EncodeToString(signature),
+		ChainName:       o.chainName,
+		OperatorAddress: o.config.OperatorAddress,
+	}
+	o.logger.Debug("Signed task response", "signature", hex.EncodeToString(signature))
+	o.logger.Debug("Signed task response", "taskResponse", taskResponse)
+	o.logger.Debug("Signed task response", "taskResponseHash", hex.EncodeToString(taskResponseHash[:]))
 	o.logger.Debug("Signed task response", "signedTaskResponse", signedTaskResponse)
 	return signedTaskResponse, nil
 }
