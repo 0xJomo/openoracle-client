@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	cryptoecdsa "crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
@@ -26,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/chainio/txmgr"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	"github.com/Layr-Labs/eigensdk-go/crypto/ecdsa"
 	sdkecdsa "github.com/Layr-Labs/eigensdk-go/crypto/ecdsa"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	sdklogging "github.com/Layr-Labs/eigensdk-go/logging"
@@ -142,10 +144,7 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		logger.Warnf("OPERATOR_ECDSA_KEY_PASSWORD env var not set. using empty string")
 	}
 
-	ecdsaKey, err := sdkecdsa.ReadKey(
-		c.EcdsaPrivateKeyStorePath,
-		ecdsaKeyPassword,
-	)
+	ecdsaKey, err := ecdsa.ReadKey(c.EcdsaPrivateKeyStorePath, ecdsaKeyPassword)
 	signerV2, _, err := signerv2.SignerFromConfig(signerv2.Config{
 		KeystorePath: c.EcdsaPrivateKeyStorePath,
 		Password:     ecdsaKeyPassword,
@@ -354,8 +353,15 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 		log.Fatalf("Error serializing TaskResponse to JSON: %v", err)
 		return SignedTaskResponse{}, err
 	}
+	prefixedHash := crypto.Keccak256Hash([]byte(fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(taskResponseHash), taskResponseHash)))
 	// Sign the hash using the operator's ECDSA private key
-	signature, err := crypto.Sign(taskResponseHash[:], o.ecdsaKey)
+	signature, err := crypto.Sign(prefixedHash[:], o.ecdsaKey)
+	// Adjust 'v' value; Ethereum expects 'v' to be 27 or 28
+	// Go's crypto.Sign returns 'v' as 0 or 1, so we adjust it by adding 27
+	if signature[64] < 27 {
+		signature[64] += 27
+	}
+	o.logger.Info("Signed task response", "signature64", signature[64])
 	if err != nil {
 		log.Fatalf("Error signing task response: %v", err)
 		return SignedTaskResponse{}, err
@@ -366,14 +372,13 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 	}
 	signedTaskResponse := SignedTaskResponse{
 		TaskResponse:    taskResponse,
-		Signature:       signature,
+		Signature:       "0x" + hex.EncodeToString(signature),
 		ChainName:       o.chainName,
 		OperatorAddress: o.config.OperatorAddress,
 	}
-	o.logger.Info("Signed task response", "parse", crypto.VerifySignature(o.operatorAddr[:], taskResponseHash[:], signature))
-	o.logger.Info("Signed task response", "signature", signature)
-	o.logger.Info("Signed task response", "taskResponse", taskResponse)
-	o.logger.Info("Signed task response", "taskResponseHash", taskResponseHash)
-	o.logger.Info("Signed task response", "signedTaskResponse", signedTaskResponse)
+	o.logger.Debug("Signed task response", "signature", hex.EncodeToString(signature))
+	o.logger.Debug("Signed task response", "taskResponse", taskResponse)
+	o.logger.Debug("Signed task response", "taskResponseHash", hex.EncodeToString(taskResponseHash[:]))
+	o.logger.Debug("Signed task response", "signedTaskResponse", signedTaskResponse)
 	return signedTaskResponse, nil
 }

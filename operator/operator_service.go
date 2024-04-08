@@ -18,7 +18,7 @@ type SignedTaskResponse struct {
 	ChainName       string                                            `json:"chainName"`
 	TaskResponse    *cstaskmanager.IOpenOracleTaskManagerTaskResponse `json:"taskResponse"`
 	OperatorAddress string                                            `json:"operatorAddress"`
-	Signature       []byte                                            `json:"signature"`
+	Signature       string                                            `json:"signature"`
 }
 
 func SendECDSASignedRequest(payload SignedTaskResponse, url string) error {
