@@ -31,10 +31,10 @@ func TestOperator(t *testing.T) {
 		newTaskCreatedLog := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				TaskType:         uint8(taskType),
-				TaskCreatedBlock: 1000,
-				StakeThreshold:   big.NewInt(aggtypes.STAKE_THRESHOLD),
-				ResponderNumber:  aggtypes.RESPONDER_NUMBER,
+				TaskType:           uint8(taskType),
+				TaskCreatedBlock:   1000,
+				StakeThreshold:     big.NewInt(aggtypes.STAKE_THRESHOLD),
+				ResponderThreshold: aggtypes.RESPONDER_NUMBER,
 			},
 			Raw: types.Log{},
 		}
@@ -55,10 +55,10 @@ func TestOperator(t *testing.T) {
 		newTaskCreatedEvent := &cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated{
 			TaskIndex: taskIndex,
 			Task: cstaskmanager.IOpenOracleTaskManagerTask{
-				TaskType:         uint8(taskType),
-				TaskCreatedBlock: 1000,
-				StakeThreshold:   big.NewInt(aggtypes.STAKE_THRESHOLD),
-				ResponderNumber:  aggtypes.RESPONDER_NUMBER,
+				TaskType:           uint8(taskType),
+				TaskCreatedBlock:   1000,
+				StakeThreshold:     big.NewInt(aggtypes.STAKE_THRESHOLD),
+				ResponderThreshold: aggtypes.RESPONDER_NUMBER,
 			},
 			Raw: types.Log{},
 		}

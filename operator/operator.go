@@ -327,7 +327,7 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 		"taskType", newTaskCreatedLog.Task.TaskType,
 		"taskIndex", newTaskCreatedLog.TaskIndex,
 		"taskCreatedBlock", newTaskCreatedLog.Task.TaskCreatedBlock,
-		"responderNumber", newTaskCreatedLog.Task.ResponderNumber,
+		"responderThreshold", newTaskCreatedLog.Task.ResponderThreshold,
 		"stakeThreshold", newTaskCreatedLog.Task.StakeThreshold,
 		"creator", newTaskCreatedLog.Task.Creator,
 		"creationFee", newTaskCreatedLog.Task.CreationFee,
