@@ -66,7 +66,7 @@ func createMockSignedTaskResponse(mockTask MockTask, keypair bls.KeyPair) (*Sign
 	taskResponse := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 		ReferenceTaskIndex: mockTask.TaskNum,
 		Result:             big.NewInt(int64(1234)),
-		TimeStamp:          big.NewInt(int64(1234)),
+		Timestamp:          big.NewInt(int64(1234)),
 	}
 	taskResponseHash, err := core.GetTaskResponseDigest(taskResponse)
 	if err != nil {

@@ -43,7 +43,7 @@ func TestOperator(t *testing.T) {
 		want := &cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 			ReferenceTaskIndex: taskIndex,
 			Result:             goldPrice,
-			TimeStamp:          big.NewInt(1234),
+			Timestamp:          big.NewInt(1234),
 		}
 		assert.Equal(t, got, want)
 	})
@@ -72,7 +72,7 @@ func TestOperator(t *testing.T) {
 			TaskResponse: cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 				ReferenceTaskIndex: taskIndex,
 				Result:             big.NewInt(2222),
-				TimeStamp:          big.NewInt(2222),
+				Timestamp:          big.NewInt(2222),
 			},
 			BlsSignature: bls.Signature{
 				G1Point: bls.NewG1Point(X, Y),

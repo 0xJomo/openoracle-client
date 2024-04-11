@@ -25,7 +25,7 @@ func AbiEncodeTaskResponse(h *cstaskmanager.IOpenOracleTaskManagerTaskResponse) 
 			Type: "uint256",
 		},
 		{
-			Name: "timeStamp",
+			Name: "timestamp",
 			Type: "uint256",
 		},
 	})
