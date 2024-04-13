@@ -23,10 +23,12 @@ const (
 )
 
 // Update here if add more data source
+// Not using BusinessInsider source for now since it updates slowly
 const DATA_SOURCE_COUNT = 2
 
 const (
-	Cnbc = iota
+	Nasdaq = iota
+	Cnbc
 	Insider
 )
 
@@ -41,6 +43,14 @@ type CnbcApiResponse struct {
 type InsiderApiResponse struct {
 	Close float64 `json:"Close"`
 	Open  float64 `json:"Open"`
+}
+
+type NasdaqApiResponse struct {
+	Data struct {
+		PrimaryData struct {
+			LastSalePrice string `json:"lastSalePrice"`
+		} `json:"primaryData"`
+	} `json:"data"`
 }
 
 var taskTypeToInsiderType = map[uint8]string{
@@ -59,10 +69,12 @@ var taskTypeToCnbcId = map[uint8]string{
 	Oil:       "CL.1",
 }
 
-type ApiResponse struct {
-	SpreadProfilePrices []struct {
-		Ask float64 `json:"ask"`
-	} `json:"spreadProfilePrices"`
+var taskTypeToNasdaqId = map[uint8]string{
+	Gold:      "GC%3ACMX",
+	Silver:    "SI%3ACMX",
+	Platinum:  "PL%3ACMX",
+	Palladium: "PA%3ACMX",
+	Oil:       "CL%3ANMX",
 }
 
 type SignedTaskResponse struct {
@@ -95,31 +107,6 @@ func SendECDSASignedRequest(payload SignedTaskResponse, url string) error {
 	defer resp.Body.Close()
 
 	return nil
-}
-
-// FetchGoldPrice function fetches the first gold ask price from the API
-func FetchGoldPrice() (int64, error) {
-	resp, err := http.Get("https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD")
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, err
-	}
-
-	var apiResponse []ApiResponse
-	if err := json.Unmarshal(body, &apiResponse); err != nil {
-		return 0, err
-	}
-
-	if len(apiResponse) > 0 && len(apiResponse[0].SpreadProfilePrices) > 0 {
-		return int64(apiResponse[0].SpreadProfilePrices[0].Ask * 100), nil
-	}
-
-	return 0, nil // No data available
 }
 
 func FetchPrice(taskType uint8) (int64, error) {
@@ -187,6 +174,41 @@ func FetchPrice(taskType uint8) (int64, error) {
 		if len(apiResponse) > 0 {
 			return int64(apiResponse[0].Close * 100), nil
 		}
+	case Nasdaq:
+		nasdaq_url := fmt.Sprintf(
+			"https://api.nasdaq.com/api/quote/%s/info?assetclass=commodities",
+			taskTypeToNasdaqId[taskType],
+		)
+		// fmt.Println(nasdaq_url)
+
+		client := &http.Client{}
+		req, _ := http.NewRequest("GET", nasdaq_url, nil)
+		req.Header.Add("Accept", "*/*")
+		req.Header.Add("Accept-Language", "en-US,en;q=0.9")
+		req.Header.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return 0, err
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return 0, err
+		}
+		var apiResponse NasdaqApiResponse
+		if err := json.Unmarshal(body, &apiResponse); err != nil {
+			return 0, err
+		}
+
+		priceStr := strings.Replace(apiResponse.Data.PrimaryData.LastSalePrice, ",", "", -1)
+		priceStr = strings.Replace(priceStr, "$", "", -1)
+		val, err := strconv.ParseFloat(priceStr, 64)
+		if err != nil {
+			return 0, err
+		}
+		return int64(val * 100), nil
 	default:
 		return 0, err
 	}
