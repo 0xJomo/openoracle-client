@@ -9,12 +9,14 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
 const (
-	Gold = iota // Gold = 0
-	Oil
+	Oil = iota // Oil = 0
+	Gold
 	Silver
 	Platinum
 	Palladium
@@ -31,7 +33,7 @@ const (
 type CnbcApiResponse struct {
 	FormattedQuoteResult struct {
 		FormattedQuote []struct {
-			Last float64 `json:"last"`
+			Last string `json:"last"`
 		} `json:"FormattedQuote"`
 	} `json:"FormattedQuoteResult"`
 }
@@ -122,14 +124,18 @@ func FetchGoldPrice() (int64, error) {
 
 func FetchPrice(taskType uint8) (int64, error) {
 	// Generate a random number to randomly choose a data source
-	bigNum, err := rand.Int(rand.Reader, big.NewInt(2))
+	bigNum, err := rand.Int(rand.Reader, big.NewInt(DATA_SOURCE_COUNT))
 	if err != nil {
 		return 0, err
 	}
 	switch bigNum.Int64() {
 	case Cnbc:
-		resp, err := http.Get(fmt.Sprintf("https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=%40%s",
-			taskTypeToCnbcId[taskType]))
+		cnbc_url := fmt.Sprintf(
+			"https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=%%40%s",
+			taskTypeToCnbcId[taskType],
+		)
+		// fmt.Println(cnbc_url)
+		resp, err := http.Get(cnbc_url)
 		if err != nil {
 			return 0, err
 		}
@@ -139,22 +145,32 @@ func FetchPrice(taskType uint8) (int64, error) {
 		if err != nil {
 			return 0, err
 		}
-		var apiResponse []CnbcApiResponse
+		var apiResponse CnbcApiResponse
 		if err := json.Unmarshal(body, &apiResponse); err != nil {
 			return 0, err
 		}
-		if len(apiResponse) > 0 && len(apiResponse[0].FormattedQuoteResult.FormattedQuote) > 0 {
-			return int64(apiResponse[0].FormattedQuoteResult.FormattedQuote[0].Last * 100), nil
+
+		if len(apiResponse.FormattedQuoteResult.FormattedQuote) > 0 {
+			val, err := strconv.ParseFloat(strings.Replace(apiResponse.FormattedQuoteResult.FormattedQuote[0].Last, ",", "", -1), 64)
+			if err != nil {
+				return 0, err
+			}
+			return int64(val * 100), nil
 		}
 	case Insider:
 		now := time.Now()
+		yesterday := now.AddDate(0, 0, -1)
 		// Format the date into YYYYMMDD type
 		formatted := fmt.Sprintf("%d%02d%02d", now.Year(), now.Month(), now.Day())
-		resp, err := http.Get(
-			fmt.Sprintf("https://markets.businessinsider.com/Ajax/Chart_GetChartData?instrumentType=Commodity&tkData=300002,%s,0,333&from=%s&to=%s",
-				taskTypeToInsiderType[taskType],
-				formatted,
-				formatted))
+		formatted_yesterday := fmt.Sprintf("%d%02d%02d", yesterday.Year(), yesterday.Month(), yesterday.Day())
+		insider_url := fmt.Sprintf(
+			"https://markets.businessinsider.com/Ajax/Chart_GetChartData?instrumentType=Commodity&tkData=300002,%s,0,333&from=%s&to=%s",
+			taskTypeToInsiderType[taskType],
+			formatted_yesterday,
+			formatted,
+		)
+		// fmt.Println(insider_url)
+		resp, err := http.Get(insider_url)
 		if err != nil {
 			return 0, err
 		}
