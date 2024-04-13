@@ -72,8 +72,8 @@ var taskTypeToCnbcId = map[uint8]string{
 var taskTypeToNasdaqId = map[uint8]string{
 	Gold:      "GC%3ACMX",
 	Silver:    "SI%3ACMX",
-	Platinum:  "PL%3ACMX",
-	Palladium: "PA%3ACMX",
+	Platinum:  "PL%3ANMX",
+	Palladium: "PA%3ANMX",
 	Oil:       "CL%3ANMX",
 }
 
