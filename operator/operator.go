@@ -333,15 +333,21 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 		"creationFee", newTaskCreatedLog.Task.CreationFee,
 	)
 
-	goldPrice, error := FetchGoldPrice()
+	// goldPrice, error := FetchGoldPrice()
+	// if error != nil {
+	// 	o.logger.Error("Fetching gold price", "error", error)
+	// 	return nil, error
+	// }
+
+	price, error := FetchPrice(newTaskCreatedLog.Task.TaskType)
 	if error != nil {
-		o.logger.Error("Fetching gold price", "error", error)
+		o.logger.Error("Fetching price", "error", error)
 		return nil, error
 	}
 
 	taskResponse := cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 		ReferenceTaskIndex: newTaskCreatedLog.TaskIndex,
-		Result:             big.NewInt(goldPrice),
+		Result:             big.NewInt(price),
 		Timestamp:          big.NewInt(time.Now().Unix()),
 	}
 	return &taskResponse, nil
