@@ -179,10 +179,6 @@ var (
 
 var requiredFlags = []cli.Flag{
 	ConfigFileFlag,
-	OperatorAddressFlag,
-	BlsPrivateKeyStorePathFlag,
-	CredibleSquaringDeploymentFileFlag,
-	EcdsaPrivateKeyFlag,
 }
 
 var optionalFlags = []cli.Flag{}
