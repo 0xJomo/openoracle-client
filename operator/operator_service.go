@@ -20,6 +20,15 @@ const (
 	Silver
 	Platinum
 	Palladium
+	Copper
+	RbobGas
+	NaturalGas
+	Brent
+	Corn
+	Soybean
+	RoughRice
+	Cocca
+	Lumber
 )
 
 // Update here if add more data source
@@ -62,19 +71,37 @@ var taskTypeToInsiderType = map[uint8]string{
 }
 
 var taskTypeToCnbcId = map[uint8]string{
-	Gold:      "GC.1",
-	Silver:    "SI.1",
-	Platinum:  "PL.1",
-	Palladium: "PA.1",
-	Oil:       "CL.1",
+	Gold:       "GC.1",
+	Silver:     "SI.1",
+	Platinum:   "PL.1",
+	Palladium:  "PA.1",
+	Oil:        "CL.1",
+	Copper:     "HG.1",
+	RbobGas:    "RB.1",
+	NaturalGas: "NG.1",
+	Brent:      "LCO.1",
+	Corn:       "C.1",
+	Soybean:    "S.1",
+	RoughRice:  "RR.1",
+	Cocca:      "CC.1",
+	Lumber:     "LBR.1",
 }
 
 var taskTypeToNasdaqId = map[uint8]string{
-	Gold:      "GC%3ACMX",
-	Silver:    "SI%3ACMX",
-	Platinum:  "PL%3ANMX",
-	Palladium: "PA%3ANMX",
-	Oil:       "CL%3ANMX",
+	Gold:       "GC%3ACMX",
+	Silver:     "SI%3ACMX",
+	Platinum:   "PL%3ANMX",
+	Palladium:  "PA%3ANMX",
+	Oil:        "CL%3ANMX",
+	Copper:     "HG%3ACMX",
+	RbobGas:    "RB%3ANMX",
+	NaturalGas: "NG%3ANMX",
+	Brent:      "BZ%3ANMX",
+	Corn:       "ZC",
+	Soybean:    "ZS",
+	RoughRice:  "ZR",
+	Cocca:      "CJ%3ANMX",
+	Lumber:     "LBR",
 }
 
 type SignedTaskResponse struct {
