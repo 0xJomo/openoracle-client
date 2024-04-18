@@ -57,7 +57,7 @@ type Operator struct {
 	chainName        string
 	avsWriter        *chainio.AvsWriter
 	avsReader        chainio.AvsReaderer
-	avsSubscriber    chainio.AvsSubscriberer
+	avsSubscriber    chainio.AvsSubscriber
 	eigenlayerReader sdkelcontracts.ELReader
 	eigenlayerWriter sdkelcontracts.ELWriter
 	blsKeypair       *bls.KeyPair
@@ -218,7 +218,7 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		chainName:                          c.ChainName,
 		avsWriter:                          avsWriter,
 		avsReader:                          avsReader,
-		avsSubscriber:                      avsSubscriber,
+		avsSubscriber:                      *avsSubscriber,
 		eigenlayerReader:                   sdkClients.ElChainReader,
 		eigenlayerWriter:                   sdkClients.ElChainWriter,
 		blsKeypair:                         blsKeyPair,
@@ -286,38 +286,45 @@ func (o *Operator) Start(ctx context.Context) error {
 	}
 
 	// TODO(samlaf): wrap this call with increase in avs-node-spec metric
-	sub := o.avsSubscriber.SubscribeToNewTasks(o.newTaskCreatedChan)
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case err := <-metricsErrChan:
-			// TODO(samlaf); we should also register the service as unhealthy in the node api
-			// https://eigen.nethermind.io/docs/spec/api/
-			o.logger.Fatal("Error in metrics server", "err", err)
-		case err := <-sub.Err():
-			o.logger.Error("Error in websocket subscription", "err", err)
-			// TODO(samlaf): write unit tests to check if this fixed the issues we were seeing
-			sub.Unsubscribe()
-			// TODO(samlaf): wrap this call with increase in avs-node-spec metric
-			sub = o.avsSubscriber.SubscribeToNewTasks(o.newTaskCreatedChan)
-		case newTaskCreatedLog := <-o.newTaskCreatedChan:
-			o.metrics.IncNumTasksReceived()
-			// TODO: call aggregator API to check if task has received enough response
-			taskResponse, err := o.ProcessNewTaskCreatedLog(newTaskCreatedLog)
-			if err != nil {
-				continue
+
+	for _, taskManager := range o.avsSubscriber.AvsContractBindings.TaskManagers {
+		go func(tm *cstaskmanager.ContractOpenOracleTaskManager) {
+			newTaskCreatedChan := make(chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated)
+			sub := o.avsSubscriber.SubscribeToNewTasks(tm, newTaskCreatedChan)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case err := <-metricsErrChan:
+					// TODO(samlaf); we should also register the service as unhealthy in the node api
+					// https://eigen.nethermind.io/docs/spec/api/
+					o.logger.Fatal("Error in metrics server", "err", err)
+				case err := <-sub.Err():
+					o.logger.Error("Error in websocket subscription", "err", err)
+					// TODO(samlaf): write unit tests to check if this fixed the issues we were seeing
+					sub.Unsubscribe()
+					// TODO(samlaf): wrap this call with increase in avs-node-spec metric
+					sub = o.avsSubscriber.SubscribeToNewTasks(tm, newTaskCreatedChan)
+				case newTaskCreatedLog := <-o.newTaskCreatedChan:
+					o.metrics.IncNumTasksReceived()
+					// TODO: call aggregator API to check if task has received enough response
+					taskResponse, err := o.ProcessNewTaskCreatedLog(newTaskCreatedLog)
+					if err != nil {
+						continue
+					}
+					signedTaskResponse, err := o.SignTaskResponse(taskResponse)
+					if err != nil {
+						continue
+					}
+					// TODO: send response to aggregator
+					o.logger.Info("Processed task", "success", signedTaskResponse)
+					SendECDSASignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
+					o.metrics.IncNumTasksAcceptedByAggregator()
+				}
 			}
-			signedTaskResponse, err := o.SignTaskResponse(taskResponse)
-			if err != nil {
-				continue
-			}
-			// TODO: send response to aggregator
-			o.logger.Info("Processed task", "success", signedTaskResponse)
-			SendECDSASignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
-			o.metrics.IncNumTasksAcceptedByAggregator()
-		}
+		}(taskManager)
 	}
+	return nil
 }
 
 // Takes a NewTaskCreatedLog struct as input and returns a TaskResponseHeader struct.

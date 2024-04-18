@@ -1,6 +1,9 @@
 package chainio
 
 import (
+	"log"
+	"math/big"
+
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
@@ -16,7 +19,7 @@ import (
 )
 
 type AvsManagersBindings struct {
-	TaskManager    *cstaskmanager.ContractOpenOracleTaskManager
+	TaskManagers   []*cstaskmanager.ContractOpenOracleTaskManager
 	ServiceManager *csservicemanager.ContractOpenOracleServiceManager
 	ethClient      eth.Client
 	logger         logging.Logger
@@ -37,20 +40,53 @@ func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr 
 		return nil, err
 	}
 
-	taskManagerAddr, err := contractServiceManager.OpenOracleTaskManager(&bind.CallOpts{})
+	// Retrieve the total count of task managers
+	count, err := contractServiceManager.TaskManagerCount(nil)
 	if err != nil {
-		logger.Error("Failed to fetch TaskManager address", "err", err)
-		return nil, err
-	}
-	contractTaskManager, err := cstaskmanager.NewContractOpenOracleTaskManager(taskManagerAddr, ethclient)
-	if err != nil {
-		logger.Error("Failed to fetch IOpenOracleTaskManager contract", "err", err)
+		logger.Error("Failed to retrieve task manager count: %v", err)
 		return nil, err
 	}
 
+	// Slice to store active task managers
+	var activeTaskManagers []*cstaskmanager.ContractOpenOracleTaskManager
+
+	// Iterate through all task managers and check if they are active
+	var ethWsClient eth.Client
+	for i := big.NewInt(0); i.Cmp(count) < 0; i.Add(i, big.NewInt(1)) {
+		taskManager, err := contractServiceManager.TaskManagers(nil, i)
+		if err != nil {
+			log.Printf("Failed to retrieve task manager at index %v: %v", i, err)
+			continue
+		}
+		if taskManager.IsActive {
+			ethWsClient, err = eth.NewClient(taskManager.Url)
+			if err != nil {
+				logger.Errorf("Cannot create ws ethclient", "err", err)
+				return nil, err
+			}
+			contractTaskManager, err := cstaskmanager.NewContractOpenOracleTaskManager(taskManager.TaskManagerAddress, ethWsClient)
+			if err != nil {
+				logger.Error("Failed to fetch IOpenOracleTaskManager contract", "err", err)
+				return nil, err
+			}
+			activeTaskManagers = append(activeTaskManagers, contractTaskManager)
+		}
+	}
+
+	// taskManagerAddr, err := contractServiceManager.OpenOracleTaskManager(&bind.CallOpts{})
+	// if err != nil {
+	// 	logger.Error("Failed to fetch TaskManager address", "err", err)
+	// 	return nil, err
+	// }
+	// contractTaskManager1, err := cstaskmanager.NewContractOpenOracleTaskManager(taskManagerAddr, ethclient)
+	// if err != nil {
+	// 	logger.Error("Failed to fetch IOpenOracleTaskManager contract", "err", err)
+	// 	return nil, err
+	// }
+
 	return &AvsManagersBindings{
 		ServiceManager: contractServiceManager,
-		TaskManager:    contractTaskManager,
+		TaskManagers:   activeTaskManagers,
 		ethClient:      ethclient,
 		logger:         logger,
 	}, nil

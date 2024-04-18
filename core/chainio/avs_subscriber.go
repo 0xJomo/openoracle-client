@@ -3,7 +3,6 @@ package chainio
 import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/eth"
@@ -14,9 +13,9 @@ import (
 )
 
 type AvsSubscriberer interface {
-	SubscribeToNewTasks(newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription
+	SubscribeToNewTasks(taskManager *cstaskmanager.ContractOpenOracleTaskManager, newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription
 	SubscribeToTaskResponses(taskResponseLogs chan *cstaskmanager.ContractOpenOracleTaskManagerTaskResponded) event.Subscription
-	ParseTaskResponded(rawLog types.Log) (*cstaskmanager.ContractOpenOracleTaskManagerTaskResponded, error)
+	// ParseTaskResponded(rawLog types.Log) (*cstaskmanager.ContractOpenOracleTaskManagerTaskResponded, error)
 }
 
 // Subscribers use a ws connection instead of http connection like Readers
@@ -53,8 +52,8 @@ func NewAvsSubscriber(avsContractBindings *AvsManagersBindings, logger sdkloggin
 	}
 }
 
-func (s *AvsSubscriber) SubscribeToNewTasks(newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription {
-	sub, err := s.AvsContractBindings.TaskManager.WatchNewTaskCreated(
+func (s *AvsSubscriber) SubscribeToNewTasks(taskManager *cstaskmanager.ContractOpenOracleTaskManager, newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription {
+	sub, err := taskManager.WatchNewTaskCreated(
 		&bind.WatchOpts{}, newTaskCreatedChan, nil,
 	)
 	if err != nil {
@@ -64,8 +63,8 @@ func (s *AvsSubscriber) SubscribeToNewTasks(newTaskCreatedChan chan *cstaskmanag
 	return sub
 }
 
-func (s *AvsSubscriber) SubscribeToTaskResponses(taskResponseChan chan *cstaskmanager.ContractOpenOracleTaskManagerTaskResponded) event.Subscription {
-	sub, err := s.AvsContractBindings.TaskManager.WatchTaskResponded(
+func (s *AvsSubscriber) SubscribeToTaskResponses(taskManager *cstaskmanager.ContractOpenOracleTaskManager, taskResponseChan chan *cstaskmanager.ContractOpenOracleTaskManagerTaskResponded) event.Subscription {
+	sub, err := taskManager.WatchTaskResponded(
 		&bind.WatchOpts{}, taskResponseChan,
 	)
 	if err != nil {
@@ -75,6 +74,6 @@ func (s *AvsSubscriber) SubscribeToTaskResponses(taskResponseChan chan *cstaskma
 	return sub
 }
 
-func (s *AvsSubscriber) ParseTaskResponded(rawLog types.Log) (*cstaskmanager.ContractOpenOracleTaskManagerTaskResponded, error) {
-	return s.AvsContractBindings.TaskManager.ContractOpenOracleTaskManagerFilterer.ParseTaskResponded(rawLog)
-}
+// func (s *AvsSubscriber) ParseTaskResponded(rawLog types.Log) (*cstaskmanager.ContractOpenOracleTaskManagerTaskResponded, error) {
+// 	return s.AvsContractBindings.TaskManager.ContractOpenOracleTaskManagerFilterer.ParseTaskResponded(rawLog)
+// }
