@@ -68,8 +68,6 @@ type Operator struct {
 	newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated
 	// ip address of aggregator
 	aggregatorServerIpPortAddr string
-	// rpc client to send signed task responses to aggregator
-	aggregatorRpcClient AggregatorRpcClienter
 	// needed when opting in to avs (allow this service manager contract to slash operator)
 	credibleSquaringServiceManagerAddr common.Address
 }
@@ -202,12 +200,6 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		AVS_NAME, logger, common.HexToAddress(c.OperatorAddress), quorumNames)
 	reg.MustRegister(economicMetricsCollector)
 
-	aggregatorRpcClient, err := NewAggregatorRpcClient(c.AggregatorServerIpPortAddress, logger, avsAndEigenMetrics)
-	if err != nil {
-		logger.Error("Cannot create AggregatorRpcClient. Is aggregator running?", "err", err)
-		return nil, err
-	}
-
 	operator := &Operator{
 		config:                             c,
 		logger:                             logger,
@@ -225,7 +217,6 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		ecdsaKey:                           ecdsaKey,
 		operatorAddr:                       common.HexToAddress(c.OperatorAddress),
 		aggregatorServerIpPortAddr:         c.AggregatorServerIpPortAddress,
-		aggregatorRpcClient:                aggregatorRpcClient,
 		newTaskCreatedChan:                 make(chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated),
 		credibleSquaringServiceManagerAddr: common.HexToAddress(c.AVSRegistryCoordinatorAddress),
 		operatorId:                         [32]byte{0}, // this is set below
@@ -286,7 +277,7 @@ func (o *Operator) Start(ctx context.Context) error {
 	}
 
 	// TODO(samlaf): wrap this call with increase in avs-node-spec metric
-
+	var runningTaskManagers = len(o.avsSubscriber.AvsContractBindings.TaskManagers)
 	for _, taskManager := range o.avsSubscriber.AvsContractBindings.TaskManagers {
 		go func(tm *cstaskmanager.ContractOpenOracleTaskManager) {
 			newTaskCreatedChan := make(chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated)
@@ -294,6 +285,7 @@ func (o *Operator) Start(ctx context.Context) error {
 			for {
 				select {
 				case <-ctx.Done():
+					runningTaskManagers--
 					return
 				case err := <-metricsErrChan:
 					// TODO(samlaf); we should also register the service as unhealthy in the node api
@@ -323,6 +315,11 @@ func (o *Operator) Start(ctx context.Context) error {
 				}
 			}
 		}(taskManager)
+	}
+	for {
+		if runningTaskManagers <= 0 {
+			break
+		}
 	}
 	return nil
 }

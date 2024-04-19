@@ -56,6 +56,7 @@ func (s *AvsSubscriber) SubscribeToNewTasks(taskManager *cstaskmanager.ContractO
 	sub, err := taskManager.WatchNewTaskCreated(
 		&bind.WatchOpts{}, newTaskCreatedChan, nil,
 	)
+
 	if err != nil {
 		s.logger.Error("Failed to subscribe to new TaskManager tasks", "err", err)
 	}

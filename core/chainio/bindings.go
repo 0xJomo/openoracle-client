@@ -59,7 +59,8 @@ func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr 
 			continue
 		}
 		if taskManager.IsActive {
-			ethWsClient, err = eth.NewClient(taskManager.Url)
+			// TODO: fetch from config based on task manager chain
+			ethWsClient, err = eth.NewClient("ws://localhost:8545")
 			if err != nil {
 				logger.Errorf("Cannot create ws ethclient", "err", err)
 				return nil, err

@@ -3,7 +3,6 @@ package chainio
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	sdkavsregistry "github.com/Layr-Labs/eigensdk-go/chainio/clients/avsregistry"
@@ -11,16 +10,11 @@ import (
 	logging "github.com/Layr-Labs/eigensdk-go/logging"
 
 	erc20mock "avs-oracle/contracts/bindings/ERC20Mock"
-	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
 	"avs-oracle/core/config"
 )
 
 type AvsReaderer interface {
 	sdkavsregistry.AvsRegistryReader
-
-	CheckSignatures(
-		ctx context.Context, msgHash [32]byte, quorumNumbers []byte, referenceBlockNumber uint32, nonSignerStakesAndSignature cstaskmanager.IBLSSignatureCheckerNonSignerStakesAndSignature,
-	) (cstaskmanager.IBLSSignatureCheckerQuorumStakeTotals, error)
 	GetErc20Mock(ctx context.Context, tokenAddr gethcommon.Address) (*erc20mock.ContractERC20Mock, error)
 }
 
@@ -52,18 +46,6 @@ func NewAvsReader(avsRegistryReader sdkavsregistry.AvsRegistryReader, avsService
 		AvsServiceBindings: avsServiceBindings,
 		logger:             logger,
 	}, nil
-}
-
-func (r *AvsReader) CheckSignatures(
-	ctx context.Context, msgHash [32]byte, quorumNumbers []byte, referenceBlockNumber uint32, nonSignerStakesAndSignature cstaskmanager.IBLSSignatureCheckerNonSignerStakesAndSignature,
-) (cstaskmanager.IBLSSignatureCheckerQuorumStakeTotals, error) {
-	stakeTotalsPerQuorum, _, err := r.AvsServiceBindings.TaskManager.CheckSignatures(
-		&bind.CallOpts{}, msgHash, quorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature,
-	)
-	if err != nil {
-		return cstaskmanager.IBLSSignatureCheckerQuorumStakeTotals{}, err
-	}
-	return stakeTotalsPerQuorum, nil
 }
 
 func (r *AvsReader) GetErc20Mock(ctx context.Context, tokenAddr gethcommon.Address) (*erc20mock.ContractERC20Mock, error) {
