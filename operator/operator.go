@@ -315,6 +315,7 @@ func (o *Operator) Start(ctx context.Context) error {
 			// TODO: send response to aggregator
 			o.logger.Info("Processed task", "success", signedTaskResponse)
 			SendECDSASignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
+			o.metrics.IncNumTasksAcceptedByAggregator()
 		}
 	}
 }

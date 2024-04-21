@@ -56,9 +56,11 @@ type InsiderApiResponse struct {
 
 type NasdaqApiResponse struct {
 	Data struct {
-		PrimaryData struct {
-			LastSalePrice string `json:"lastSalePrice"`
-		} `json:"primaryData"`
+		SummaryData struct {
+			LastSalePrice struct {
+				Value string `json:"value"`
+			} `json:"LastSalePrice"`
+		} `json:"summaryData"`
 	} `json:"data"`
 }
 
@@ -203,7 +205,7 @@ func FetchPrice(taskType uint8) (int64, error) {
 		}
 	case Nasdaq:
 		nasdaq_url := fmt.Sprintf(
-			"https://api.nasdaq.com/api/quote/%s/info?assetclass=commodities",
+			"https://api.nasdaq.com/api/quote/%s/summary?assetclass=commodities",
 			taskTypeToNasdaqId[taskType],
 		)
 		// fmt.Println(nasdaq_url)
@@ -229,7 +231,7 @@ func FetchPrice(taskType uint8) (int64, error) {
 			return 0, err
 		}
 
-		priceStr := strings.Replace(apiResponse.Data.PrimaryData.LastSalePrice, ",", "", -1)
+		priceStr := strings.Replace(apiResponse.Data.SummaryData.LastSalePrice.Value, ",", "", -1)
 		priceStr = strings.Replace(priceStr, "$", "", -1)
 		val, err := strconv.ParseFloat(priceStr, 64)
 		if err != nil {
