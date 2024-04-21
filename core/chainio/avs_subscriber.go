@@ -9,14 +9,7 @@ import (
 	sdklogging "github.com/Layr-Labs/eigensdk-go/logging"
 
 	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
-	"avs-oracle/core/config"
 )
-
-type AvsSubscriberer interface {
-	SubscribeToNewTasks(taskManager *cstaskmanager.ContractOpenOracleTaskManager, newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription
-	SubscribeToTaskResponses(taskResponseLogs chan *cstaskmanager.ContractOpenOracleTaskManagerTaskResponded) event.Subscription
-	// ParseTaskResponded(rawLog types.Log) (*cstaskmanager.ContractOpenOracleTaskManagerTaskResponded, error)
-}
 
 // Subscribers use a ws connection instead of http connection like Readers
 // kind of stupid that the geth client doesn't have a unified interface for both...
@@ -27,17 +20,8 @@ type AvsSubscriber struct {
 	logger              sdklogging.Logger
 }
 
-func BuildAvsSubscriberFromConfig(config *config.Config) (*AvsSubscriber, error) {
-	return BuildAvsSubscriber(
-		config.OpenOracleRegistryCoordinatorAddr,
-		config.OperatorStateRetrieverAddr,
-		config.EthHttpClient,
-		config.Logger,
-	)
-}
-
-func BuildAvsSubscriber(registryCoordinatorAddr, blsOperatorStateRetrieverAddr gethcommon.Address, ethclient eth.Client, logger sdklogging.Logger) (*AvsSubscriber, error) {
-	avsContractBindings, err := NewAvsManagersBindings(registryCoordinatorAddr, blsOperatorStateRetrieverAddr, ethclient, logger)
+func BuildAvsSubscriber(registryCoordinatorAddr, blsOperatorStateRetrieverAddr gethcommon.Address, ethclient eth.Client, ethWsClients map[string]eth.Client, logger sdklogging.Logger) (*AvsSubscriber, error) {
+	avsContractBindings, err := NewAvsManagersBindings(registryCoordinatorAddr, blsOperatorStateRetrieverAddr, ethclient, ethWsClients, logger)
 	if err != nil {
 		logger.Errorf("Failed to create contract bindings", "err", err)
 		return nil, err
@@ -74,7 +58,3 @@ func (s *AvsSubscriber) SubscribeToTaskResponses(taskManager *cstaskmanager.Cont
 	s.logger.Infof("Subscribed to TaskResponded events")
 	return sub
 }
-
-// func (s *AvsSubscriber) ParseTaskResponded(rawLog types.Log) (*cstaskmanager.ContractOpenOracleTaskManagerTaskResponded, error) {
-// 	return s.AvsContractBindings.TaskManager.ContractOpenOracleTaskManagerFilterer.ParseTaskResponded(rawLog)
-// }

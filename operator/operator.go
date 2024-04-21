@@ -94,8 +94,8 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 	nodeApi := nodeapi.NewNodeApi(AVS_NAME, SEM_VER, c.NodeApiIpPortAddress, logger)
 
 	var ethRpcClient, ethWsClient eth.Client
+	rpcCallsCollector := rpccalls.NewCollector(AVS_NAME, reg)
 	if c.EnableMetrics {
-		rpcCallsCollector := rpccalls.NewCollector(AVS_NAME, reg)
 		ethRpcClient, err = eth.NewInstrumentedClient(c.EthRpcUrl, rpcCallsCollector)
 		if err != nil {
 			logger.Errorf("Cannot create http ethclient", "err", err)
@@ -116,6 +116,26 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		if err != nil {
 			logger.Errorf("Cannot create ws ethclient", "err", err)
 			return nil, err
+		}
+	}
+
+	// eth client mapping for taskManagers in different chains
+	ethWsClients := make(map[string]eth.Client)
+	for chainName, chainUrl := range c.ChainUrls {
+		if c.EnableMetrics {
+			ethWsClient, err = eth.NewInstrumentedClient(chainUrl, rpcCallsCollector)
+			if err != nil {
+				logger.Errorf("Cannot create ws ethclient", "err", err)
+				return nil, err
+			}
+			ethWsClients[chainName] = ethWsClient
+		} else {
+			ethWsClient, err = eth.NewClient(chainUrl)
+			if err != nil {
+				logger.Errorf("Cannot create ws ethclient", "err", err)
+				return nil, err
+			}
+			ethWsClients[chainName] = ethWsClient
 		}
 	}
 
@@ -183,7 +203,7 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		return nil, err
 	}
 	avsSubscriber, err := chainio.BuildAvsSubscriber(common.HexToAddress(c.AVSRegistryCoordinatorAddress),
-		common.HexToAddress(c.OperatorStateRetrieverAddress), ethWsClient, logger,
+		common.HexToAddress(c.OperatorStateRetrieverAddress), ethWsClient, ethWsClients, logger,
 	)
 	if err != nil {
 		logger.Error("Cannot create AvsSubscriber", "err", err)
