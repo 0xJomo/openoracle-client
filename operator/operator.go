@@ -280,8 +280,7 @@ func (o *Operator) Start(ctx context.Context) error {
 	var runningTaskManagers = len(o.avsSubscriber.AvsContractBindings.TaskManagers)
 	for _, taskManager := range o.avsSubscriber.AvsContractBindings.TaskManagers {
 		go func(tm *cstaskmanager.ContractOpenOracleTaskManager) {
-			newTaskCreatedChan := make(chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated)
-			sub := o.avsSubscriber.SubscribeToNewTasks(tm, newTaskCreatedChan)
+			sub := o.avsSubscriber.SubscribeToNewTasks(tm, o.newTaskCreatedChan)
 			for {
 				select {
 				case <-ctx.Done():
@@ -296,7 +295,7 @@ func (o *Operator) Start(ctx context.Context) error {
 					// TODO(samlaf): write unit tests to check if this fixed the issues we were seeing
 					sub.Unsubscribe()
 					// TODO(samlaf): wrap this call with increase in avs-node-spec metric
-					sub = o.avsSubscriber.SubscribeToNewTasks(tm, newTaskCreatedChan)
+					sub = o.avsSubscriber.SubscribeToNewTasks(tm, o.newTaskCreatedChan)
 				case newTaskCreatedLog := <-o.newTaskCreatedChan:
 					o.metrics.IncNumTasksReceived()
 					// TODO: call aggregator API to check if task has received enough response

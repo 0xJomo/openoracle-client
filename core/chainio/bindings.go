@@ -47,8 +47,21 @@ func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr 
 		return nil, err
 	}
 
+	taskManagerAddr, err := contractServiceManager.OpenOracleTaskManager(&bind.CallOpts{})
+	if err != nil {
+		logger.Error("Failed to fetch TaskManager address", "err", err)
+		return nil, err
+	}
+
+	contractTaskManager, err := cstaskmanager.NewContractOpenOracleTaskManager(taskManagerAddr, ethclient)
+	if err != nil {
+		logger.Error("Failed to fetch IOpenOracleTaskManager contract", "err", err)
+		return nil, err
+	}
+
 	// Slice to store active task managers
 	var activeTaskManagers []*cstaskmanager.ContractOpenOracleTaskManager
+	activeTaskManagers = append(activeTaskManagers, contractTaskManager)
 
 	// Iterate through all task managers and check if they are active
 	var ethWsClient eth.Client
