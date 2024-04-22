@@ -57,7 +57,7 @@ type Operator struct {
 	chainName        string
 	avsWriter        *chainio.AvsWriter
 	avsReader        chainio.AvsReaderer
-	avsSubscriber    chainio.AvsSubscriber
+	avsSubscriber    chainio.AvsSubscriberer
 	eigenlayerReader sdkelcontracts.ELReader
 	eigenlayerWriter sdkelcontracts.ELWriter
 	blsKeypair       *bls.KeyPair
@@ -230,7 +230,7 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		chainName:                          c.ChainName,
 		avsWriter:                          avsWriter,
 		avsReader:                          avsReader,
-		avsSubscriber:                      *avsSubscriber,
+		avsSubscriber:                      avsSubscriber,
 		eigenlayerReader:                   sdkClients.ElChainReader,
 		eigenlayerWriter:                   sdkClients.ElChainWriter,
 		blsKeypair:                         blsKeyPair,
@@ -297,8 +297,8 @@ func (o *Operator) Start(ctx context.Context) error {
 	}
 
 	// TODO(samlaf): wrap this call with increase in avs-node-spec metric
-	var runningTaskManagers = len(o.avsSubscriber.AvsContractBindings.TaskManagers)
-	for _, taskManager := range o.avsSubscriber.AvsContractBindings.TaskManagers {
+	var runningTaskManagers = len(o.avsSubscriber.GetAvsContractBindings().TaskManagers)
+	for _, taskManager := range o.avsSubscriber.GetAvsContractBindings().TaskManagers {
 		go func(tm *cstaskmanager.ContractOpenOracleTaskManager) {
 			sub := o.avsSubscriber.SubscribeToNewTasks(tm, o.newTaskCreatedChan)
 			for {

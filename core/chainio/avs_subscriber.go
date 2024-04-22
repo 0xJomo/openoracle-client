@@ -11,6 +11,12 @@ import (
 	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
 )
 
+type AvsSubscriberer interface {
+	SubscribeToNewTasks(taskManager *cstaskmanager.ContractOpenOracleTaskManager, newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription
+	SubscribeToTaskResponses(taskManager *cstaskmanager.ContractOpenOracleTaskManager, taskResponseChan chan *cstaskmanager.ContractOpenOracleTaskManagerTaskResponded) event.Subscription
+	GetAvsContractBindings() *AvsManagersBindings
+}
+
 // Subscribers use a ws connection instead of http connection like Readers
 // kind of stupid that the geth client doesn't have a unified interface for both...
 // it takes a single url, so the bindings, even though they have watcher functions, those can't be used
@@ -27,6 +33,10 @@ func BuildAvsSubscriber(registryCoordinatorAddr, blsOperatorStateRetrieverAddr g
 		return nil, err
 	}
 	return NewAvsSubscriber(avsContractBindings, logger), nil
+}
+
+func (s *AvsSubscriber) GetAvsContractBindings() *AvsManagersBindings {
+	return s.AvsContractBindings
 }
 
 func NewAvsSubscriber(avsContractBindings *AvsManagersBindings, logger sdklogging.Logger) *AvsSubscriber {
