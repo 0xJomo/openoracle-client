@@ -25,7 +25,7 @@ type AvsManagersBindings struct {
 	logger         logging.Logger
 }
 
-func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr gethcommon.Address, ethclient eth.Client, ethWsClients map[string]eth.Client, logger logging.Logger) (*AvsManagersBindings, error) {
+func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr gethcommon.Address, ethclient eth.Client, chainWsClients map[string]eth.Client, logger logging.Logger) (*AvsManagersBindings, error) {
 	contractRegistryCoordinator, err := regcoord.NewContractRegistryCoordinator(registryCoordinatorAddr, ethclient)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr 
 			log.Printf("Failed to retrieve task manager at index %v: %v", i, err)
 			continue
 		}
-		chainWsClient, ok := ethWsClients[taskManager.ChainName]
+		chainWsClient, ok := chainWsClients[taskManager.ChainName]
 		if !ok {
 			log.Printf("Chain url not found", taskManager.ChainName)
 			continue
