@@ -340,7 +340,7 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 	// 	return nil, error
 	// }
 
-	price, error := FetchPrice(newTaskCreatedLog.Task.TaskType)
+	price, error := o.FetchPrice(newTaskCreatedLog.Task.TaskType)
 	if error != nil {
 		o.logger.Error("Fetching price", "error", error)
 		return nil, error

@@ -138,7 +138,7 @@ func SendECDSASignedRequest(payload SignedTaskResponse, url string) error {
 	return nil
 }
 
-func FetchPrice(taskType uint8) (int64, error) {
+func (o *Operator) FetchPrice(taskType uint8) (int64, error) {
 	// Generate a random number to randomly choose a data source
 	bigNum, err := rand.Int(rand.Reader, big.NewInt(DATA_SOURCE_COUNT))
 	if err != nil {
@@ -146,6 +146,7 @@ func FetchPrice(taskType uint8) (int64, error) {
 	}
 	switch bigNum.Int64() {
 	case Cnbc:
+		o.metrics.IncNumRequestToCnbc()
 		cnbc_url := fmt.Sprintf(
 			"https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=%%40%s",
 			taskTypeToCnbcId[taskType],
@@ -153,22 +154,26 @@ func FetchPrice(taskType uint8) (int64, error) {
 		// fmt.Println(cnbc_url)
 		resp, err := http.Get(cnbc_url)
 		if err != nil {
+			o.metrics.IncNumErrorFromCnbc()
 			return 0, err
 		}
 		defer resp.Body.Close()
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
+			o.metrics.IncNumErrorFromCnbc()
 			return 0, err
 		}
 		var apiResponse CnbcApiResponse
 		if err := json.Unmarshal(body, &apiResponse); err != nil {
+			o.metrics.IncNumErrorFromCnbc()
 			return 0, err
 		}
 
 		if len(apiResponse.FormattedQuoteResult.FormattedQuote) > 0 {
 			val, err := strconv.ParseFloat(strings.Replace(apiResponse.FormattedQuoteResult.FormattedQuote[0].Last, ",", "", -1), 64)
 			if err != nil {
+				o.metrics.IncNumErrorFromCnbc()
 				return 0, err
 			}
 			return int64(val * 100), nil
@@ -204,6 +209,7 @@ func FetchPrice(taskType uint8) (int64, error) {
 			return int64(apiResponse[0].Close * 100), nil
 		}
 	case Nasdaq:
+		o.metrics.IncNumRequestToNasdaq()
 		nasdaq_url := fmt.Sprintf(
 			"https://api.nasdaq.com/api/quote/%s/summary?assetclass=commodities",
 			taskTypeToNasdaqId[taskType],
@@ -218,16 +224,19 @@ func FetchPrice(taskType uint8) (int64, error) {
 
 		resp, err := client.Do(req)
 		if err != nil {
+			o.metrics.IncNumErrorFromNasdaq()
 			return 0, err
 		}
 		defer resp.Body.Close()
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
+			o.metrics.IncNumErrorFromNasdaq()
 			return 0, err
 		}
 		var apiResponse NasdaqApiResponse
 		if err := json.Unmarshal(body, &apiResponse); err != nil {
+			o.metrics.IncNumErrorFromNasdaq()
 			return 0, err
 		}
 
@@ -235,6 +244,7 @@ func FetchPrice(taskType uint8) (int64, error) {
 		priceStr = strings.Replace(priceStr, "$", "", -1)
 		val, err := strconv.ParseFloat(priceStr, 64)
 		if err != nil {
+			o.metrics.IncNumErrorFromNasdaq()
 			return 0, err
 		}
 		return int64(val * 100), nil
