@@ -12,7 +12,7 @@ import (
 )
 
 type AvsSubscriberer interface {
-	SubscribeToNewTasks(taskManager *cstaskmanager.ContractOpenOracleTaskManager, newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription
+	SubscribeToNewTasks(taskManager ChainTaskManager, newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription
 	SubscribeToTaskResponses(taskManager *cstaskmanager.ContractOpenOracleTaskManager, taskResponseChan chan *cstaskmanager.ContractOpenOracleTaskManagerTaskResponded) event.Subscription
 	GetAvsContractBindings() *AvsManagersBindings
 }
@@ -46,15 +46,15 @@ func NewAvsSubscriber(avsContractBindings *AvsManagersBindings, logger sdkloggin
 	}
 }
 
-func (s *AvsSubscriber) SubscribeToNewTasks(taskManager *cstaskmanager.ContractOpenOracleTaskManager, newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription {
-	sub, err := taskManager.WatchNewTaskCreated(
+func (s *AvsSubscriber) SubscribeToNewTasks(taskManager ChainTaskManager, newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) event.Subscription {
+	sub, err := taskManager.TaskManager.WatchNewTaskCreated(
 		&bind.WatchOpts{}, newTaskCreatedChan, nil,
 	)
 
 	if err != nil {
-		s.logger.Error("Failed to subscribe to new TaskManager tasks", "err", err)
+		s.logger.Error("Failed to subscribe to new TaskManager tasks", taskManager.ChainName, "err", err)
 	}
-	s.logger.Infof("Subscribed to new TaskManager tasks")
+	s.logger.Infof("Subscribed to new TaskManager tasks", taskManager.ChainName)
 	return sub
 }
 

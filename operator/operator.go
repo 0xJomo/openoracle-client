@@ -54,7 +54,6 @@ type Operator struct {
 	metricsReg       *prometheus.Registry
 	metrics          metrics.Metrics
 	nodeApi          *nodeapi.NodeApi
-	chainName        string
 	avsWriter        *chainio.AvsWriter
 	avsReader        chainio.AvsReaderer
 	avsSubscriber    chainio.AvsSubscriberer
@@ -227,7 +226,6 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		metrics:                            avsAndEigenMetrics,
 		nodeApi:                            nodeApi,
 		ethClient:                          ethRpcClient,
-		chainName:                          c.ChainName,
 		avsWriter:                          avsWriter,
 		avsReader:                          avsReader,
 		avsSubscriber:                      avsSubscriber,
@@ -299,7 +297,7 @@ func (o *Operator) Start(ctx context.Context) error {
 	// TODO(samlaf): wrap this call with increase in avs-node-spec metric
 	var runningTaskManagers = len(o.avsSubscriber.GetAvsContractBindings().TaskManagers)
 	for _, taskManager := range o.avsSubscriber.GetAvsContractBindings().TaskManagers {
-		go func(tm *cstaskmanager.ContractOpenOracleTaskManager) {
+		go func(tm chainio.ChainTaskManager) {
 			sub := o.avsSubscriber.SubscribeToNewTasks(tm, o.newTaskCreatedChan)
 			for {
 				select {
@@ -319,11 +317,11 @@ func (o *Operator) Start(ctx context.Context) error {
 				case newTaskCreatedLog := <-o.newTaskCreatedChan:
 					o.metrics.IncNumTasksReceived()
 					// TODO: call aggregator API to check if task has received enough response
-					taskResponse, err := o.ProcessNewTaskCreatedLog(newTaskCreatedLog)
+					taskResponse, err := o.ProcessNewTaskCreatedLog(tm, newTaskCreatedLog)
 					if err != nil {
 						continue
 					}
-					signedTaskResponse, err := o.SignTaskResponse(taskResponse)
+					signedTaskResponse, err := o.SignTaskResponse(taskResponse, tm.ChainName)
 					if err != nil {
 						continue
 					}
@@ -345,9 +343,10 @@ func (o *Operator) Start(ctx context.Context) error {
 
 // Takes a NewTaskCreatedLog struct as input and returns a TaskResponseHeader struct.
 // The TaskResponseHeader struct is the struct that is signed and sent to the contract as a task response.
-func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) (*cstaskmanager.IOpenOracleTaskManagerTaskResponse, error) {
+func (o *Operator) ProcessNewTaskCreatedLog(chainTaskManager chainio.ChainTaskManager, newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) (*cstaskmanager.IOpenOracleTaskManagerTaskResponse, error) {
 	o.logger.Debug("Received new task", "task", newTaskCreatedLog)
 	o.logger.Info("Received new task",
+		"chainName", chainTaskManager.ChainName,
 		"taskType", newTaskCreatedLog.Task.TaskType,
 		"taskIndex", newTaskCreatedLog.TaskIndex,
 		"taskCreatedBlock", newTaskCreatedLog.Task.TaskCreatedBlock,
@@ -377,7 +376,7 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 	return &taskResponse, nil
 }
 
-func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskManagerTaskResponse) (SignedTaskResponse, error) {
+func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskManagerTaskResponse, chainName string) (SignedTaskResponse, error) {
 	taskResponseHash, err := core.GetTaskResponseDigest(taskResponse)
 	if err != nil {
 		log.Fatalf("Error serializing TaskResponse to JSON: %v", err)
@@ -391,7 +390,6 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 	if signature[64] < 27 {
 		signature[64] += 27
 	}
-	o.logger.Info("Signed task response", "signature64", signature[64])
 	if err != nil {
 		log.Fatalf("Error signing task response: %v", err)
 		return SignedTaskResponse{}, err
@@ -403,7 +401,7 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 	signedTaskResponse := SignedTaskResponse{
 		TaskResponse:    taskResponse,
 		Signature:       "0x" + hex.EncodeToString(signature),
-		ChainName:       o.chainName,
+		ChainName:       chainName,
 		OperatorAddress: o.config.OperatorAddress,
 	}
 	o.logger.Debug("Signed task response", "signature", hex.EncodeToString(signature))

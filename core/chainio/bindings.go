@@ -19,10 +19,15 @@ import (
 )
 
 type AvsManagersBindings struct {
-	TaskManagers   []*cstaskmanager.ContractOpenOracleTaskManager
+	TaskManagers   []ChainTaskManager
 	ServiceManager *csservicemanager.ContractOpenOracleServiceManager
 	ethClient      eth.Client
 	logger         logging.Logger
+}
+
+type ChainTaskManager struct {
+	TaskManager *cstaskmanager.ContractOpenOracleTaskManager
+	ChainName   string
 }
 
 func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr gethcommon.Address, ethclient eth.Client, chainWsClients map[string]eth.Client, logger logging.Logger) (*AvsManagersBindings, error) {
@@ -48,7 +53,7 @@ func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr 
 	}
 
 	// Slice to store active task managers
-	var activeTaskManagers []*cstaskmanager.ContractOpenOracleTaskManager
+	var activeTaskManagers []ChainTaskManager
 
 	// Iterate through all task managers and check if they are active
 	for i := big.NewInt(0); i.Cmp(count) < 0; i.Add(i, big.NewInt(1)) {
@@ -69,7 +74,10 @@ func NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr 
 				logger.Error("Failed to fetch IOpenOracleTaskManager contract", "err", err)
 				return nil, err
 			}
-			activeTaskManagers = append(activeTaskManagers, contractTaskManager)
+			activeTaskManagers = append(activeTaskManagers, ChainTaskManager{
+				contractTaskManager,
+				taskManager.ChainName,
+			})
 		}
 	}
 
