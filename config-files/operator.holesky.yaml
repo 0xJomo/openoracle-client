@@ -19,7 +19,7 @@ eth_ws_url: wss://holesky.drpc.org
 # this should be /operator_keys/ecdsa_key.json as the host path will be asked while running
 #
 # If you are running locally using go run main.go, this should be full path to your local ecdsa key file
-ecdsa_private_key_store_path: tests/holesky/keys//ecdsa.key.json
+ecdsa_private_key_store_path: scripts/holesky/keys/ecdsa.key.json
 
 # If you running this using eigenlayer CLI and the provided AVS packaging structure,
 # this should be /operator_keys/bls_key.json as the host path will be asked while running
@@ -27,7 +27,7 @@ ecdsa_private_key_store_path: tests/holesky/keys//ecdsa.key.json
 # We are using bn254 curve for bls keys
 #
 # If you are running locally using go run main.go, this should be full path to your local bls key file
-bls_private_key_store_path: tests/holesky/keys/bls.key.json
+bls_private_key_store_path: scripts/holesky/keys/bls.key.json
 
 aggregator_server_ip_port_address: open-oracle-aggregator:8090
 
