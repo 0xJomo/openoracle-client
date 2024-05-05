@@ -3,11 +3,10 @@ package operator
 import (
 	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,13 +32,21 @@ const (
 
 // Update here if add more data source
 // Not using BusinessInsider source for now since it updates slowly
-const DATA_SOURCE_COUNT = 2
+const DATA_SOURCE_COUNT = 3
 
 const (
 	Nasdaq = iota
 	Cnbc
+	Tradingview
 	Insider
 )
+
+var sourceToWeight = map[uint8]float64{
+	Nasdaq:      1.0,
+	Cnbc:        2.0,
+	Tradingview: 2.0,
+	Insider:     0,
+}
 
 type CnbcApiResponse struct {
 	FormattedQuoteResult struct {
@@ -62,6 +69,10 @@ type NasdaqApiResponse struct {
 			} `json:"LastSalePrice"`
 		} `json:"summaryData"`
 	} `json:"data"`
+}
+
+type TradingviewApiResponse struct {
+	Close float64 `json:"close"`
 }
 
 var taskTypeToInsiderType = map[uint8]string{
@@ -106,6 +117,23 @@ var taskTypeToNasdaqId = map[uint8]string{
 	Lumber:     "LBR",
 }
 
+var taskTypeToTradingviewId = map[uint8]string{
+	Gold:       "COMEX:GC1!",
+	Silver:     "COMEX:SI1!",
+	Platinum:   "NYMEX:PL1!",
+	Palladium:  "NYMEX:PA1!",
+	Oil:        "NYMEX:CL1!",
+	Copper:     "COMEX:HG1!",
+	RbobGas:    "NYMEX:RB1!",
+	NaturalGas: "NYMEX:NG1!",
+	Brent:      "NYMEX:BB1!",
+	Corn:       "CBOT:ZC1!",
+	Soybean:    "CBOT:ZS1!",
+	RoughRice:  "CBOT:ZR1!",
+	Cocca:      "ICEUS:CC1!",
+	Lumber:     "CME:LBR1!",
+}
+
 type SignedTaskResponse struct {
 	ChainName       string                                            `json:"chainName"`
 	TaskResponse    *cstaskmanager.IOpenOracleTaskManagerTaskResponse `json:"taskResponse"`
@@ -140,11 +168,29 @@ func SendECDSASignedRequest(payload SignedTaskResponse, url string) error {
 
 func (o *Operator) FetchPrice(taskType uint8) (int64, error) {
 	// Generate a random number to randomly choose a data source
-	bigNum, err := rand.Int(rand.Reader, big.NewInt(DATA_SOURCE_COUNT))
-	if err != nil {
-		return 0, err
+	var total float64 = 0.0
+	var totalWeight float64 = 0
+	var source uint8 = 0
+
+	for ; source < DATA_SOURCE_COUNT; source++ {
+		res, err := o.FetchPriceFromSource(taskType, source)
+		if err != nil {
+			o.logger.Error("Error fetching from source", "err", err)
+			continue
+		}
+		total += res * sourceToWeight[source]
+		totalWeight += sourceToWeight[source]
 	}
-	switch bigNum.Int64() {
+
+	if totalWeight < 1.0 {
+		return 0, errors.New("No price source fetched successfully")
+	}
+
+	return int64(total / totalWeight * 100), nil
+}
+
+func (o *Operator) FetchPriceFromSource(taskType uint8, source uint8) (float64, error) {
+	switch source {
 	case Cnbc:
 		o.metrics.IncNumRequestToCnbc()
 		cnbc_url := fmt.Sprintf(
@@ -176,7 +222,7 @@ func (o *Operator) FetchPrice(taskType uint8) (int64, error) {
 				o.metrics.IncNumErrorFromCnbc()
 				return 0, err
 			}
-			return int64(val * 100), nil
+			return val, nil
 		}
 	case Insider:
 		now := time.Now()
@@ -206,7 +252,7 @@ func (o *Operator) FetchPrice(taskType uint8) (int64, error) {
 			return 0, err
 		}
 		if len(apiResponse) > 0 {
-			return int64(apiResponse[0].Close * 100), nil
+			return apiResponse[0].Close, nil
 		}
 	case Nasdaq:
 		o.metrics.IncNumRequestToNasdaq()
@@ -247,9 +293,39 @@ func (o *Operator) FetchPrice(taskType uint8) (int64, error) {
 			o.metrics.IncNumErrorFromNasdaq()
 			return 0, err
 		}
-		return int64(val * 100), nil
+		return val, nil
+	case Tradingview:
+		o.metrics.IncNumRequestToTradingview()
+		tradingview_url := fmt.Sprintf(
+			"https://scanner.tradingview.com/symbol?fields=close&symbol=%s",
+			taskTypeToTradingviewId[taskType],
+		)
+		// fmt.Println(tradingview_url)
+
+		client := &http.Client{}
+		req, _ := http.NewRequest("GET", tradingview_url, nil)
+		// req.Header.Add("Accept", "*/*")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			o.metrics.IncNumErrorFromTradingview()
+			return 0, err
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			o.metrics.IncNumErrorFromTradingview()
+			return 0, err
+		}
+		var apiResponse TradingviewApiResponse
+		if err := json.Unmarshal(body, &apiResponse); err != nil {
+			o.metrics.IncNumErrorFromTradingview()
+			return 0, err
+		}
+		return apiResponse.Close, nil
 	default:
-		return 0, err
+		return 0, errors.New("wrong pricefeed source")
 	}
-	return 0, err
+	return 0, errors.New("wrong pricefeed source")
 }

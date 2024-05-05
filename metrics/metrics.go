@@ -17,6 +17,8 @@ type Metrics interface {
 	IncNumErrorFromNasdaq()
 	IncNumRequestToCnbc()
 	IncNumErrorFromCnbc()
+	IncNumRequestToTradingview()
+	IncNumErrorFromTradingview()
 }
 
 // AvsMetrics contains instrumented metrics that should be incremented by the avs node using the methods below
@@ -29,6 +31,8 @@ type AvsAndEigenMetrics struct {
 	numErrorFromNasdaq                         prometheus.Counter
 	numRequestToCnbc                           prometheus.Counter
 	numErrorFromCnbc                           prometheus.Counter
+	numRequestToTradingview                    prometheus.Counter
+	numErrorFromTradingview                    prometheus.Counter
 }
 
 const openOracleNamespace = "openoracle"
@@ -72,6 +76,18 @@ func NewAvsAndEigenMetrics(avsName string, eigenMetrics *metrics.EigenMetrics, r
 				Name:      "num_error_received_from_cnbc",
 				Help:      "The number of errors received from cnbc when requesting task data",
 			}),
+		numRequestToTradingview: promauto.With(reg).NewCounter(
+			prometheus.CounterOpts{
+				Namespace: openOracleNamespace,
+				Name:      "num_request_sent_to_tradingview",
+				Help:      "The number of requests sent to tradingview to get task data",
+			}),
+		numErrorFromTradingview: promauto.With(reg).NewCounter(
+			prometheus.CounterOpts{
+				Namespace: openOracleNamespace,
+				Name:      "num_error_received_from_tradingview",
+				Help:      "The number of errors received from tradingview when requesting task data",
+			}),
 	}
 }
 
@@ -97,4 +113,12 @@ func (m *AvsAndEigenMetrics) IncNumRequestToCnbc() {
 
 func (m *AvsAndEigenMetrics) IncNumErrorFromCnbc() {
 	m.numErrorFromCnbc.Inc()
+}
+
+func (m *AvsAndEigenMetrics) IncNumRequestToTradingview() {
+	m.numRequestToTradingview.Inc()
+}
+
+func (m *AvsAndEigenMetrics) IncNumErrorFromTradingview() {
+	m.numErrorFromTradingview.Inc()
 }
