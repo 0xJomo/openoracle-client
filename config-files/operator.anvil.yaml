@@ -3,6 +3,8 @@ production: true
 
 operator_address: 0x860B6912C2d0337ef05bbC89b0C2CB6CbAEAB4A5
 
+operator_signature_address: 0xfd50eb4f6a9743d07d0fba5f23b7a04bf6ce7765
+
 # EigenLayer Slasher contract address
 
 # This is the address of the slasher which is deployed in the anvil saved state
@@ -20,6 +22,8 @@ eth_ws_url: ws://localhost:8545
 #
 # If you are running locally using go run main.go, this should be full path to your local ecdsa key file
 ecdsa_private_key_store_path: tests/keys/test.ecdsa.key.json
+
+ecdsa_sign_private_key_store_path: tests/keys/test.ecdsa.signkey.json
 
 # If you running this using eigenlayer CLI and the provided AVS packaging structure,
 # this should be /operator_keys/bls_key.json as the host path will be asked while running

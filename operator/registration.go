@@ -109,7 +109,7 @@ func (o *Operator) RegisterOperatorWithAvs(
 	_, err = o.avsWriter.RegisterOperatorInQuorumWithAVSRegistryCoordinator(
 		context.Background(),
 		operatorEcdsaKeyPair, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry,
-		o.blsKeypair, quorumNumbers, socket,
+		o.blsKeypair, quorumNumbers, socket, o.operatorSignatureAddr,
 	)
 	if err != nil {
 		o.logger.Errorf("Unable to register operator with avs registry coordinator")
