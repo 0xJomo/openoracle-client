@@ -44,6 +44,7 @@ enable_node_api: true
 
 chain_urls:
   anvil: ws://localhost:8545
+  sepolia: wss://eth-sepolia.g.alchemy.com/v2/6pTjiIQ4nSKq6wQBgk10o0FKUWJqB0ku
 
 register_operator_on_startup: true
 # address of token to deposit tokens into when registering on startup
