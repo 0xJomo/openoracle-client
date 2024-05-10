@@ -76,13 +76,13 @@ func (mr *MockAvsWritererMockRecorder) RegisterOperatorInQuorumWithAVSRegistryCo
 }
 
 // SendAggregatedResponse mocks base method.
-func (m *MockAvsWriterer) SendAggregatedResponse(arg0 context.Context, arg1 contractOpenOracleTaskManager.IOpenOracleTaskManagerTask, arg2 contractOpenOracleTaskManager.IOpenOracleTaskManagerTaskResponse, arg3 contractOpenOracleTaskManager.IBLSSignatureCheckerNonSignerStakesAndSignature) (*types.Receipt, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SendAggregatedResponse", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(*types.Receipt)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
+// func (m *MockAvsWriterer) SendAggregatedResponse(arg0 context.Context, arg1 contractOpenOracleTaskManager.IOpenOracleTaskManagerTask, arg2 contractOpenOracleTaskManager.IOpenOracleTaskManagerTaskResponse, arg3 contractOpenOracleTaskManager.IBLSSignatureCheckerNonSignerStakesAndSignature) (*types.Receipt, error) {
+// 	m.ctrl.T.Helper()
+// 	ret := m.ctrl.Call(m, "SendAggregatedResponse", arg0, arg1, arg2, arg3)
+// 	ret0, _ := ret[0].(*types.Receipt)
+// 	ret1, _ := ret[1].(error)
+// 	return ret0, ret1
+// }
 
 // SendAggregatedResponse indicates an expected call of SendAggregatedResponse.
 func (mr *MockAvsWritererMockRecorder) SendAggregatedResponse(arg0, arg1, arg2, arg3 any) *gomock.Call {
