@@ -141,20 +141,39 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		return nil, err
 	}
 
+	// Get ECDSA key and signer
 	ecdsaKeyPassword, ok := os.LookupEnv("OPERATOR_ECDSA_KEY_PASSWORD")
 	if !ok {
 		logger.Warnf("OPERATOR_ECDSA_KEY_PASSWORD env var not set. using empty string")
 	}
-
 	ecdsaKey, err := ecdsa.ReadKey(c.EcdsaPrivateKeyStorePath, ecdsaKeyPassword)
 	signerV2, _, err := signerv2.SignerFromConfig(signerv2.Config{
 		KeystorePath: c.EcdsaPrivateKeyStorePath,
 		Password:     ecdsaKeyPassword,
 	}, chainId)
+
+	ecdsaSignerKeyPassword, ok := os.LookupEnv("OPERATOR_SIGNER_ECDSA_KEY_PASSWORD")
+	if !ok {
+		logger.Warnf("OPERATOR_SIGNER_ECDSA_KEY_PASSWORD env var not set. using empty string")
+	}
+	// TODO: stop gap solution here to separate start operator vs register operator
+	// When starting operator, the operator private key won't be here and won't be used
+	// So we use the signer private key here just to fill the space
+	if err != nil {
+		ecdsaKey, err = ecdsa.ReadKey(c.EcdsaPrivateSignKeyStorePath, ecdsaSignerKeyPassword)
+		signerV2, _, err = signerv2.SignerFromConfig(signerv2.Config{
+			KeystorePath: c.EcdsaPrivateSignKeyStorePath,
+			Password:     ecdsaSignerKeyPassword,
+		}, chainId)
+	}
+
+	// If unable to get any signer, panic
 	if err != nil {
 		panic(err)
 	}
-	ecdsaSignKey, err := ecdsa.ReadKey(c.EcdsaPrivateSignKeyStorePath, ecdsaKeyPassword)
+
+	// Get the ECDSA key for signing task responses
+	ecdsaSignKey, err := ecdsa.ReadKey(c.EcdsaPrivateSignKeyStorePath, ecdsaSignerKeyPassword)
 	if err != nil {
 		panic(err)
 	}
