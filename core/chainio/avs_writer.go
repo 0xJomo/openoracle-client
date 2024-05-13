@@ -22,7 +22,6 @@ import (
 
 	regcoord "avs-oracle/contracts/bindings/RegistryCoordinator"
 
-	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
 	"avs-oracle/core/config"
 
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/elcontracts"
@@ -34,17 +33,11 @@ import (
 )
 
 type AvsWriterer interface {
-	SendNewTaskNumberToSquare(
-		ctx context.Context,
-		taskType uint8,
-		responderThreshold uint8,
-		stakeThreshold *big.Int,
-	) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error)
-	SendAggregatedResponse(ctx context.Context,
-		task cstaskmanager.IOpenOracleTaskManagerTask,
-		taskResponse cstaskmanager.IOpenOracleTaskManagerTaskResponse,
-		nonSignerStakesAndSignature cstaskmanager.IBLSSignatureCheckerNonSignerStakesAndSignature,
-	) (*types.Receipt, error)
+	// SendAggregatedResponse(ctx context.Context,
+	// 	task cstaskmanager.IOpenOracleTaskManagerTask,
+	// 	taskResponse cstaskmanager.IOpenOracleTaskManagerTaskResponse,
+	// 	nonSignerStakesAndSignature cstaskmanager.IBLSSignatureCheckerNonSignerStakesAndSignature,
+	// ) (*types.Receipt, error)
 
 	// TODO(samlaf): an operator that is already registered in a quorum can register with another quorum without passing
 	// signatures perhaps we should add another sdk function for this purpose, that just takes in a quorumNumber and
@@ -265,7 +258,7 @@ func BuildAvsWriterFromConfig(c *config.Config) (*AvsWriter, error) {
 }
 
 func BuildAvsWriter(txMgr txmgr.TxManager, registryCoordinatorAddr, operatorStateRetrieverAddr gethcommon.Address, ethHttpClient eth.Client, logger logging.Logger) (*AvsWriter, error) {
-	avsServiceBindings, err := NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr, ethHttpClient, logger)
+	avsServiceBindings, err := NewAvsManagersBindings(registryCoordinatorAddr, operatorStateRetrieverAddr, ethHttpClient, make(map[string]eth.Client), logger)
 	if err != nil {
 		logger.Error("Failed to create contract bindings", "err", err)
 		return nil, err
@@ -355,52 +348,4 @@ func NewAvsWriter(avsServiceBindings *AvsManagersBindings, logger logging.Logger
 		elReader:               elReader,
 		client:                 ethClient,
 	}
-}
-
-// returns the tx receipt, as well as the task index (which it gets from parsing the tx receipt logs)
-func (w *AvsWriter) SendNewTaskNumberToSquare(ctx context.Context, taskType uint8, responderThreshold uint8, stakeThreshold *big.Int) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error) {
-	txOpts, err := w.TxMgr.GetNoSendTxOpts()
-	if err != nil {
-		w.logger.Errorf("Error getting tx opts")
-		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err
-	}
-	tx, err := w.AvsContractBindings.TaskManager.CreateNewTask(txOpts, taskType, responderThreshold, stakeThreshold)
-	if err != nil {
-		w.logger.Errorf("Error assembling CreateNewTask tx")
-		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err
-	}
-	receipt, err := w.TxMgr.Send(ctx, tx)
-	if err != nil {
-		w.logger.Errorf("Error submitting CreateNewTask tx")
-		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err
-	}
-	newTaskCreatedEvent, err := w.AvsContractBindings.TaskManager.ContractOpenOracleTaskManagerFilterer.ParseNewTaskCreated(*receipt.Logs[0])
-	if err != nil {
-		w.logger.Error("Aggregator failed to parse new task created event", "err", err)
-		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err
-	}
-	return newTaskCreatedEvent.Task, newTaskCreatedEvent.TaskIndex, nil
-}
-
-func (w *AvsWriter) SendAggregatedResponse(
-	ctx context.Context, task cstaskmanager.IOpenOracleTaskManagerTask,
-	taskResponse cstaskmanager.IOpenOracleTaskManagerTaskResponse,
-	nonSignerStakesAndSignature cstaskmanager.IBLSSignatureCheckerNonSignerStakesAndSignature,
-) (*types.Receipt, error) {
-	// txOpts, err := w.TxMgr.GetNoSendTxOpts()
-	// if err != nil {
-	// 	w.logger.Errorf("Error getting tx opts")
-	// 	return nil, err
-	// }
-	// tx, err := w.AvsContractBindings.TaskManager.RespondToTask(txOpts, task, taskResponse, nSignerStakesAndSignature)
-	// if err != nil {
-	// 	w.logger.Error("Error submitting SubmitTaskResponse tx while calling respondToTask", "err", err)
-	// 	return nil, err
-	// }
-	// receipt, err := w.TxMgr.Send(ctx, tx)
-	// if err != nil {
-	// 	w.logger.Errorf("Error submitting CreateNewTask tx")
-	// 	return nil, err
-	// }
-	return nil, nil
 }

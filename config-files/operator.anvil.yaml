@@ -19,4 +19,9 @@ enable_metrics: true
 node_api_ip_port_address: localhost:9010
 enable_node_api: true
 
+chain_urls:
+  local: ws://localhost:8545
+  sepolia: wss://eth-sepolia.g.alchemy.com/v2/6pTjiIQ4nSKq6wQBgk10o0FKUWJqB0ku
+  plumetest: wss://plume-testnet.rpc.caldera.xyz/infra-partner-ws
+
 register_operator_on_startup: true
