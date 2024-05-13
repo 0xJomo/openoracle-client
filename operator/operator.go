@@ -70,8 +70,6 @@ type Operator struct {
 	newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated
 	// ip address of aggregator
 	aggregatorServerIpPortAddr string
-	// rpc client to send signed task responses to aggregator
-	aggregatorRpcClient AggregatorRpcClienter
 	// needed when opting in to avs (allow this service manager contract to slash operator)
 	credibleSquaringServiceManagerAddr common.Address
 }
@@ -98,8 +96,8 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 	nodeApi := nodeapi.NewNodeApi(AVS_NAME, SEM_VER, c.NodeApiIpPortAddress, logger)
 
 	var ethRpcClient, ethWsClient eth.Client
+	rpcCallsCollector := rpccalls.NewCollector(AVS_NAME, reg)
 	if c.EnableMetrics {
-		rpcCallsCollector := rpccalls.NewCollector(AVS_NAME, reg)
 		ethRpcClient, err = eth.NewInstrumentedClient(c.EthRpcUrl, rpcCallsCollector)
 		if err != nil {
 			logger.Errorf("Cannot create http ethclient", "err", err)
@@ -120,6 +118,26 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		if err != nil {
 			logger.Errorf("Cannot create ws ethclient", "err", err)
 			return nil, err
+		}
+	}
+
+	// eth client mapping for taskManagers in different chains
+	chainWsClients := make(map[string]eth.Client)
+	for chainName, chainUrl := range c.ChainUrls {
+		if c.EnableMetrics {
+			chainWsClient, err := eth.NewInstrumentedClient(chainUrl, rpcCallsCollector)
+			if err != nil {
+				logger.Errorf("Cannot create ws ethclient", "err", err)
+				return nil, err
+			}
+			chainWsClients[chainName] = chainWsClient
+		} else {
+			ethWsClient, err = eth.NewClient(chainUrl)
+			if err != nil {
+				logger.Errorf("Cannot create ws ethclient", "err", err)
+				return nil, err
+			}
+			chainWsClients[chainName] = ethWsClient
 		}
 	}
 
@@ -210,7 +228,7 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		return nil, err
 	}
 	avsSubscriber, err := chainio.BuildAvsSubscriber(common.HexToAddress(c.AVSRegistryCoordinatorAddress),
-		common.HexToAddress(c.OperatorStateRetrieverAddress), ethWsClient, logger,
+		common.HexToAddress(c.OperatorStateRetrieverAddress), ethWsClient, chainWsClients, logger,
 	)
 	if err != nil {
 		logger.Error("Cannot create AvsSubscriber", "err", err)
@@ -227,12 +245,6 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		AVS_NAME, logger, common.HexToAddress(c.OperatorAddress), quorumNames)
 	reg.MustRegister(economicMetricsCollector)
 
-	aggregatorRpcClient, err := NewAggregatorRpcClient(c.AggregatorServerIpPortAddress, logger, avsAndEigenMetrics)
-	if err != nil {
-		logger.Error("Cannot create AggregatorRpcClient. Is aggregator running?", "err", err)
-		return nil, err
-	}
-
 	operator := &Operator{
 		config:                             c,
 		logger:                             logger,
@@ -240,7 +252,6 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		metrics:                            avsAndEigenMetrics,
 		nodeApi:                            nodeApi,
 		ethClient:                          ethRpcClient,
-		chainName:                          c.ChainName,
 		avsWriter:                          avsWriter,
 		avsReader:                          avsReader,
 		avsSubscriber:                      avsSubscriber,
@@ -252,7 +263,6 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		operatorAddr:                       common.HexToAddress(c.OperatorAddress),
 		operatorSignatureAddr:              common.HexToAddress(c.OperatorSignatureAddress),
 		aggregatorServerIpPortAddr:         c.AggregatorServerIpPortAddress,
-		aggregatorRpcClient:                aggregatorRpcClient,
 		newTaskCreatedChan:                 make(chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated),
 		credibleSquaringServiceManagerAddr: common.HexToAddress(c.AVSRegistryCoordinatorAddress),
 		operatorId:                         [32]byte{0}, // this is set below
@@ -313,45 +323,58 @@ func (o *Operator) Start(ctx context.Context) error {
 	}
 
 	// TODO(samlaf): wrap this call with increase in avs-node-spec metric
-	sub := o.avsSubscriber.SubscribeToNewTasks(o.newTaskCreatedChan)
+	var runningTaskManagers = len(o.avsSubscriber.GetAvsContractBindings().TaskManagers)
+	for _, taskManager := range o.avsSubscriber.GetAvsContractBindings().TaskManagers {
+		go func(tm chainio.ChainTaskManager) {
+			sub := o.avsSubscriber.SubscribeToNewTasks(tm, o.newTaskCreatedChan)
+			for {
+				select {
+				case <-ctx.Done():
+					runningTaskManagers--
+					return
+				case err := <-metricsErrChan:
+					// TODO(samlaf); we should also register the service as unhealthy in the node api
+					// https://eigen.nethermind.io/docs/spec/api/
+					o.logger.Fatal("Error in metrics server", "err", err)
+				case err := <-sub.Err():
+					o.logger.Error("Error in websocket subscription", "err", err)
+					// TODO(samlaf): write unit tests to check if this fixed the issues we were seeing
+					sub.Unsubscribe()
+					// TODO(samlaf): wrap this call with increase in avs-node-spec metric
+					sub = o.avsSubscriber.SubscribeToNewTasks(tm, o.newTaskCreatedChan)
+				case newTaskCreatedLog := <-o.newTaskCreatedChan:
+					o.metrics.IncNumTasksReceived()
+					// TODO: call aggregator API to check if task has received enough response
+					taskResponse, err := o.ProcessNewTaskCreatedLog(tm, newTaskCreatedLog)
+					if err != nil {
+						continue
+					}
+					signedTaskResponse, err := o.SignTaskResponse(taskResponse, tm.ChainName)
+					if err != nil {
+						continue
+					}
+					// TODO: send response to aggregator
+					o.logger.Info("Processed task", "success", signedTaskResponse)
+					SendECDSASignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
+					o.metrics.IncNumTasksAcceptedByAggregator()
+				}
+			}
+		}(taskManager)
+	}
 	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case err := <-metricsErrChan:
-			// TODO(samlaf); we should also register the service as unhealthy in the node api
-			// https://eigen.nethermind.io/docs/spec/api/
-			o.logger.Fatal("Error in metrics server", "err", err)
-		case err := <-sub.Err():
-			o.logger.Error("Error in websocket subscription", "err", err)
-			// TODO(samlaf): write unit tests to check if this fixed the issues we were seeing
-			sub.Unsubscribe()
-			// TODO(samlaf): wrap this call with increase in avs-node-spec metric
-			sub = o.avsSubscriber.SubscribeToNewTasks(o.newTaskCreatedChan)
-		case newTaskCreatedLog := <-o.newTaskCreatedChan:
-			o.metrics.IncNumTasksReceived()
-			// TODO: call aggregator API to check if task has received enough response
-			taskResponse, err := o.ProcessNewTaskCreatedLog(newTaskCreatedLog)
-			if err != nil {
-				continue
-			}
-			signedTaskResponse, err := o.SignTaskResponse(taskResponse)
-			if err != nil {
-				continue
-			}
-			// TODO: send response to aggregator
-			o.logger.Info("Processed task", "success", signedTaskResponse)
-			SendECDSASignedRequest(signedTaskResponse, o.config.AggregatorServerIpPortAddress)
-			o.metrics.IncNumTasksAcceptedByAggregator()
+		if runningTaskManagers <= 0 {
+			break
 		}
 	}
+	return nil
 }
 
 // Takes a NewTaskCreatedLog struct as input and returns a TaskResponseHeader struct.
 // The TaskResponseHeader struct is the struct that is signed and sent to the contract as a task response.
-func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) (*cstaskmanager.IOpenOracleTaskManagerTaskResponse, error) {
+func (o *Operator) ProcessNewTaskCreatedLog(chainTaskManager chainio.ChainTaskManager, newTaskCreatedLog *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated) (*cstaskmanager.IOpenOracleTaskManagerTaskResponse, error) {
 	o.logger.Debug("Received new task", "task", newTaskCreatedLog)
 	o.logger.Info("Received new task",
+		"chainName", chainTaskManager.ChainName,
 		"taskType", newTaskCreatedLog.Task.TaskType,
 		"taskIndex", newTaskCreatedLog.TaskIndex,
 		"taskCreatedBlock", newTaskCreatedLog.Task.TaskCreatedBlock,
@@ -381,7 +404,7 @@ func (o *Operator) ProcessNewTaskCreatedLog(newTaskCreatedLog *cstaskmanager.Con
 	return &taskResponse, nil
 }
 
-func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskManagerTaskResponse) (SignedTaskResponse, error) {
+func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskManagerTaskResponse, chainName string) (SignedTaskResponse, error) {
 	taskResponseHash, err := core.GetTaskResponseDigest(taskResponse)
 	if err != nil {
 		log.Fatalf("Error serializing TaskResponse to JSON: %v", err)
@@ -395,7 +418,6 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 	if signature[64] < 27 {
 		signature[64] += 27
 	}
-	o.logger.Info("Signed task response", "signature64", signature[64])
 	if err != nil {
 		log.Fatalf("Error signing task response: %v", err)
 		return SignedTaskResponse{}, err
@@ -407,7 +429,7 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 	signedTaskResponse := SignedTaskResponse{
 		TaskResponse:    taskResponse,
 		Signature:       "0x" + hex.EncodeToString(signature),
-		ChainName:       o.chainName,
+		ChainName:       chainName,
 		OperatorAddress: o.config.OperatorAddress,
 	}
 	o.logger.Debug("Signed task response", "signature", hex.EncodeToString(signature))
