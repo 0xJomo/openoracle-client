@@ -51,18 +51,21 @@ type Operator struct {
 	// this way, auditing this operator code makes it obvious that operators don't need to
 	// write to the chain during the course of their normal operations
 	// writing to the chain should be done via the cli only
-	metricsReg       *prometheus.Registry
-	metrics          metrics.Metrics
-	nodeApi          *nodeapi.NodeApi
-	avsWriter        *chainio.AvsWriter
-	avsReader        chainio.AvsReaderer
-	avsSubscriber    chainio.AvsSubscriberer
-	eigenlayerReader sdkelcontracts.ELReader
-	eigenlayerWriter sdkelcontracts.ELWriter
-	blsKeypair       *bls.KeyPair
-	ecdsaKey         *cryptoecdsa.PrivateKey
-	operatorId       sdktypes.OperatorId
-	operatorAddr     common.Address
+	metricsReg            *prometheus.Registry
+	metrics               metrics.Metrics
+	nodeApi               *nodeapi.NodeApi
+	chainName             string
+	avsWriter             *chainio.AvsWriter
+	avsReader             chainio.AvsReaderer
+	avsSubscriber         chainio.AvsSubscriberer
+	eigenlayerReader      sdkelcontracts.ELReader
+	eigenlayerWriter      sdkelcontracts.ELWriter
+	blsKeypair            *bls.KeyPair
+	ecdsaKey              *cryptoecdsa.PrivateKey
+	ecdsaSignKey          *cryptoecdsa.PrivateKey
+	operatorId            sdktypes.OperatorId
+	operatorAddr          common.Address
+	operatorSignatureAddr common.Address
 	// receive new tasks in this chan (typically from listening to onchain event)
 	newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated
 	// ip address of aggregator
@@ -156,16 +159,39 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		return nil, err
 	}
 
+	// Get ECDSA key and signer
 	ecdsaKeyPassword, ok := os.LookupEnv("OPERATOR_ECDSA_KEY_PASSWORD")
 	if !ok {
 		logger.Warnf("OPERATOR_ECDSA_KEY_PASSWORD env var not set. using empty string")
 	}
-
 	ecdsaKey, err := ecdsa.ReadKey(c.EcdsaPrivateKeyStorePath, ecdsaKeyPassword)
 	signerV2, _, err := signerv2.SignerFromConfig(signerv2.Config{
 		KeystorePath: c.EcdsaPrivateKeyStorePath,
 		Password:     ecdsaKeyPassword,
 	}, chainId)
+
+	ecdsaSignerKeyPassword, ok := os.LookupEnv("OPERATOR_SIGNER_ECDSA_KEY_PASSWORD")
+	if !ok {
+		logger.Warnf("OPERATOR_SIGNER_ECDSA_KEY_PASSWORD env var not set. using empty string")
+	}
+	// TODO: stop gap solution here to separate start operator vs register operator
+	// When starting operator, the operator private key won't be here and won't be used
+	// So we use the signer private key here just to fill the space
+	if err != nil {
+		ecdsaKey, err = ecdsa.ReadKey(c.EcdsaPrivateSignKeyStorePath, ecdsaSignerKeyPassword)
+		signerV2, _, err = signerv2.SignerFromConfig(signerv2.Config{
+			KeystorePath: c.EcdsaPrivateSignKeyStorePath,
+			Password:     ecdsaSignerKeyPassword,
+		}, chainId)
+	}
+
+	// If unable to get any signer, panic
+	if err != nil {
+		panic(err)
+	}
+
+	// Get the ECDSA key for signing task responses
+	ecdsaSignKey, err := ecdsa.ReadKey(c.EcdsaPrivateSignKeyStorePath, ecdsaSignerKeyPassword)
 	if err != nil {
 		panic(err)
 	}
@@ -233,7 +259,9 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		eigenlayerWriter:                   sdkClients.ElChainWriter,
 		blsKeypair:                         blsKeyPair,
 		ecdsaKey:                           ecdsaKey,
+		ecdsaSignKey:                       ecdsaSignKey,
 		operatorAddr:                       common.HexToAddress(c.OperatorAddress),
+		operatorSignatureAddr:              common.HexToAddress(c.OperatorSignatureAddress),
 		aggregatorServerIpPortAddr:         c.AggregatorServerIpPortAddress,
 		newTaskCreatedChan:                 make(chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated),
 		credibleSquaringServiceManagerAddr: common.HexToAddress(c.AVSRegistryCoordinatorAddress),
@@ -384,7 +412,7 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 	}
 	prefixedHash := crypto.Keccak256Hash([]byte(fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(taskResponseHash), taskResponseHash)))
 	// Sign the hash using the operator's ECDSA private key
-	signature, err := crypto.Sign(prefixedHash[:], o.ecdsaKey)
+	signature, err := crypto.Sign(prefixedHash[:], o.ecdsaSignKey)
 	// Adjust 'v' value; Ethereum expects 'v' to be 27 or 28
 	// Go's crypto.Sign returns 'v' as 0 or 1, so we adjust it by adding 27
 	if signature[64] < 27 {

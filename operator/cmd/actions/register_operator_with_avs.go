@@ -23,8 +23,10 @@ func RegisterOperatorWithAvs(ctx *cli.Context) error {
 		return err
 	}
 	nodeConfig.OperatorAddress, _ = os.LookupEnv("OPERATOR_ADDRESS")
+	nodeConfig.OperatorSignatureAddress, _ = os.LookupEnv("OPERATOR_SIGNATURE_ADDRESS")
 	nodeConfig.BlsPrivateKeyStorePath, _ = os.LookupEnv("BLS_PRIVATE_KEY_PATH")
 	nodeConfig.EcdsaPrivateKeyStorePath, _ = os.LookupEnv("ECDSA_PRIVATE_KEY_PATH")
+	nodeConfig.EcdsaPrivateSignKeyStorePath, _ = os.LookupEnv("ECDSA_SIGNER_PRIVATE_KEY_PATH")
 	nodeConfig.EthRpcUrl, _ = os.LookupEnv("HTTP_RPC_URL")
 	nodeConfig.EthWsUrl, _ = os.LookupEnv("WS_RPC_URL")
 
