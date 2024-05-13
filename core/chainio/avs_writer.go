@@ -89,6 +89,18 @@ type AvsWriterer interface {
 		quorumNumbers egtypes.QuorumNums,
 		pubkey regcoord.BN254G1Point,
 	) (*types.Receipt, error)
+
+	UpdateBLSPublicKey(
+		ctx context.Context,
+		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+		blsKeyPair *bls.KeyPair,
+	) (*types.Receipt, error)
+
+	UpdateOperatorSignAddr(
+		ctx context.Context,
+		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+		operatorSignatureAddr gethcommon.Address,
+	) (*types.Receipt, error)
 }
 
 type AvsWriter struct {
@@ -403,4 +415,75 @@ func (w *AvsWriter) SendAggregatedResponse(
 	// 	return nil, err
 	// }
 	return nil, nil
+}
+
+func (w *AvsWriter) UpdateBLSPublicKey(
+	ctx context.Context,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	blsKeyPair *bls.KeyPair,
+) (*types.Receipt, error) {
+	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivateKey.PublicKey)
+	w.logger.Info("update operator‘s bls key with the AVS's registry coordinator", "avs-service-manager", w.serviceManagerAddr, "operator", operatorAddr)
+	// params to register bls pubkey with bls apk registry
+	g1HashedMsgToSign, err := w.registryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{}, operatorAddr)
+	if err != nil {
+		return nil, err
+	}
+	signedMsg := utils.ConvertToBN254G1Point(
+		blsKeyPair.SignHashedToCurveMessage(utils.ConvertBn254GethToGnark(g1HashedMsgToSign)).G1Point,
+	)
+	G1pubkeyBN254 := utils.ConvertToBN254G1Point(blsKeyPair.GetPubKeyG1())
+	G2pubkeyBN254 := utils.ConvertToBN254G2Point(blsKeyPair.GetPubKeyG2())
+	pubkeyRegParams := regcoord.IBLSApkRegistryPubkeyRegistrationParams{
+		PubkeyRegistrationSignature: signedMsg,
+		PubkeyG1:                    G1pubkeyBN254,
+		PubkeyG2:                    G2pubkeyBN254,
+	}
+
+	noSendTxOpts, err := w.TxMgr.GetNoSendTxOpts()
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := w.registryCoordinator.UpdateBLSPublicKey(
+		noSendTxOpts,
+		pubkeyRegParams,
+	)
+	if err != nil {
+		return nil, err
+	}
+	receipt, err := w.TxMgr.Send(ctx, tx)
+	if err != nil {
+		return nil, errors.New("failed to send tx with err: " + err.Error())
+	}
+	w.logger.Info("successfully update operator's bls key with AVS registry coordinator", "tx hash", receipt.TxHash.String(), "avs-service-manager", w.serviceManagerAddr, "operator", operatorAddr)
+	return receipt, nil
+}
+
+func (w *AvsWriter) UpdateOperatorSignAddr(
+	ctx context.Context,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorSignatureAddr gethcommon.Address,
+) (*types.Receipt, error) {
+	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivateKey.PublicKey)
+	w.logger.Info("update operator‘s sign addr with the AVS's registry coordinator", "avs-service-manager", w.serviceManagerAddr, "operator", operatorAddr, "operatorSignatureAddr", operatorSignatureAddr)
+
+	noSendTxOpts, err := w.TxMgr.GetNoSendTxOpts()
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := w.registryCoordinator.UpdateOperatorSignAddr(
+		noSendTxOpts,
+		operatorSignatureAddr,
+	)
+	if err != nil {
+		return nil, err
+	}
+	receipt, err := w.TxMgr.Send(ctx, tx)
+	if err != nil {
+		return nil, errors.New("failed to send tx with err: " + err.Error())
+	}
+	w.logger.Info("successfully update operator's sign addr with AVS registry coordinator", "tx hash", receipt.TxHash.String(), "avs-service-manager", w.serviceManagerAddr, "operator", operatorAddr, "operatorSignatureAddr", operatorSignatureAddr)
+	return receipt, nil
 }
