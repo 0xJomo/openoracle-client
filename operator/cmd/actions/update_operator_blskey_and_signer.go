@@ -9,8 +9,6 @@ import (
 	"avs-oracle/core/config"
 	"avs-oracle/operator"
 	"avs-oracle/types"
-
-	sdkecdsa "github.com/Layr-Labs/eigensdk-go/crypto/ecdsa"
 	sdkutils "github.com/Layr-Labs/eigensdk-go/utils"
 	"github.com/urfave/cli"
 )

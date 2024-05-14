@@ -311,16 +311,22 @@ func (o *Operator) Start(ctx context.Context) error {
 		return fmt.Errorf("operator is not registered. Registering operator using the operator-cli before starting operator")
 	}
 
-	keyAndSignAddr, err := o.avsReader.GetOperatorBlsKeyAndSignAddr(&bind.CallOpts{}, o.operatorAddr)
+	G1Point, _, signerAddr, err := o.avsReader.GetOperatorBlsKeyAndSignAddr(&bind.CallOpts{}, o.operatorAddr)
 	if err != nil {
 		o.logger.Error("Error checking if operator is registered", "err", err)
 		return err
 	}
 	G1pubkeyBN254 := utils.ConvertToBN254G1Point(o.blsKeypair.GetPubKeyG1())
-	merged := append(G1pubkeyBN254.X.Bytes(), G1pubkeyBN254.Y.Bytes()...)
-	pubKeyHash := crypto.Keccak256Hash(merged)
+	check := false
+	if G1pubkeyBN254.X == G1Point.X && G1pubkeyBN254.Y == G1Point.Y {
 
-	check := keyAndSignAddr.PubkeyHash != pubKeyHash || keyAndSignAddr.Signer != o.operatorSignatureAddr
+	} else {
+		check = true
+	}
+
+	if signerAddr != o.operatorSignatureAddr {
+		check = true
+	}
 
 	if check {
 		return fmt.Errorf("The key of the operator not matched, Please restart")

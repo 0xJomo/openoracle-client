@@ -2,6 +2,7 @@ package chainio
 
 import (
 	"context"
+	"errors"
 	"github.com/Layr-Labs/eigensdk-go/types"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -11,10 +12,12 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/eth"
 	logging "github.com/Layr-Labs/eigensdk-go/logging"
 
+	blsapkregistry "avs-oracle/contracts/bindings/BLSApkRegistry"
 	erc20mock "avs-oracle/contracts/bindings/ERC20Mock"
-	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
 	regcoord "avs-oracle/contracts/bindings/RegistryCoordinator"
+	stakeregistry "avs-oracle/contracts/bindings/StakeRegistry"
 	"avs-oracle/core/config"
+	egtypes "github.com/Layr-Labs/eigensdk-go/types"
 )
 
 type AvsReaderer interface {
@@ -23,13 +26,15 @@ type AvsReaderer interface {
 
 	GetOperatorBlsKeyAndSignAddr(
 		opts *bind.CallOpts, addr types.OperatorAddr,
-	) (regcoord.IRegistryCoordinatorOperatorBlsKeyAndSigner, error)
+	) (blsapkregistry.BN254G1Point, types.Bytes32, gethcommon.Address, error)
 }
 
 type AvsReader struct {
 	sdkavsregistry.AvsRegistryReader
 	AvsServiceBindings  *AvsManagersBindings
 	RegistryCoordinator *regcoord.ContractRegistryCoordinator
+	BLSApkRegistry      *blsapkregistry.ContractBLSApkRegistry
+	StakeRegistry       *stakeregistry.ContractStakeRegistry
 	logger              logging.Logger
 }
 
@@ -48,13 +53,34 @@ func BuildAvsReader(registryCoordinatorAddr, operatorStateRetrieverAddr gethcomm
 		return nil, err
 	}
 	registryCoordinator, err := regcoord.NewContractRegistryCoordinator(registryCoordinatorAddr, ethHttpClient)
-	return NewAvsReader(avsRegistryReader, avsManagersBindings, registryCoordinator, logger)
+	if err != nil {
+		return nil, err
+	}
+	blsApkRegistryAddr, err := registryCoordinator.BlsApkRegistry(&bind.CallOpts{})
+	if err != nil {
+		return nil, egtypes.WrapError(errors.New("failed to get BLSApkRegistry address"), err)
+	}
+	blsApkRegistry, err := blsapkregistry.NewContractBLSApkRegistry(blsApkRegistryAddr, ethHttpClient)
+	if err != nil {
+		return nil, err
+	}
+	stakeRegistryAddr, err := registryCoordinator.StakeRegistry(&bind.CallOpts{})
+	if err != nil {
+		return nil, egtypes.WrapError(errors.New("failed to get StakeRegistry address"), err)
+	}
+	stakeRegistry, err := stakeregistry.NewContractStakeRegistry(stakeRegistryAddr, ethHttpClient)
+	if err != nil {
+		return nil, err
+	}
+	return NewAvsReader(avsRegistryReader, avsManagersBindings, registryCoordinator, blsApkRegistry, stakeRegistry, logger)
 }
-func NewAvsReader(avsRegistryReader sdkavsregistry.AvsRegistryReader, avsServiceBindings *AvsManagersBindings, registryCoordinator *regcoord.ContractRegistryCoordinator, logger logging.Logger) (*AvsReader, error) {
+func NewAvsReader(avsRegistryReader sdkavsregistry.AvsRegistryReader, avsServiceBindings *AvsManagersBindings, registryCoordinator *regcoord.ContractRegistryCoordinator, blsApkRegistry *blsapkregistry.ContractBLSApkRegistry, stakeRegistry *stakeregistry.ContractStakeRegistry, logger logging.Logger) (*AvsReader, error) {
 	return &AvsReader{
 		AvsRegistryReader:   avsRegistryReader,
 		AvsServiceBindings:  avsServiceBindings,
 		RegistryCoordinator: registryCoordinator,
+		BLSApkRegistry:      blsApkRegistry,
+		StakeRegistry:       stakeRegistry,
 		logger:              logger,
 	}, nil
 }
@@ -70,12 +96,16 @@ func (r *AvsReader) GetErc20Mock(ctx context.Context, tokenAddr gethcommon.Addre
 
 func (r *AvsReader) GetOperatorBlsKeyAndSignAddr(
 	opts *bind.CallOpts, addr types.OperatorAddr,
-) (regcoord.IRegistryCoordinatorOperatorBlsKeyAndSigner, error) {
-	keyAndSignAddr, err := r.RegistryCoordinator.GetOperatorBlsKeyAndSignAddr(
+) (blsapkregistry.BN254G1Point, types.Bytes32, gethcommon.Address, error) {
+	g1Point, pubkeyHash, err := r.BLSApkRegistry.GetRegisteredPubkey(
 		opts, addr,
 	)
 	if err != nil {
-		return regcoord.IRegistryCoordinatorOperatorBlsKeyAndSigner{}, err
+		return blsapkregistry.BN254G1Point{}, types.Bytes32{}, gethcommon.Address{}, err
 	}
-	return keyAndSignAddr, nil
+	singerAddr, err := r.StakeRegistry.GetOperatorSignAddress(opts, addr)
+	if err != nil {
+		return blsapkregistry.BN254G1Point{}, types.Bytes32{}, gethcommon.Address{}, err
+	}
+	return g1Point, pubkeyHash, singerAddr, nil
 }
