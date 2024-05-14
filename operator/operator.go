@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"avs-oracle/core/chainio/utils"
 	"context"
 	cryptoecdsa "crypto/ecdsa"
 	"encoding/hex"
@@ -310,6 +311,21 @@ func (o *Operator) Start(ctx context.Context) error {
 		return fmt.Errorf("operator is not registered. Registering operator using the operator-cli before starting operator")
 	}
 
+	keyAndSignAddr, err := o.avsReader.GetOperatorBlsKeyAndSignAddr(&bind.CallOpts{}, o.operatorAddr)
+	if err != nil {
+		o.logger.Error("Error checking if operator is registered", "err", err)
+		return err
+	}
+	G1pubkeyBN254 := utils.ConvertToBN254G1Point(o.blsKeypair.GetPubKeyG1())
+	merged := append(G1pubkeyBN254.X.Bytes(), G1pubkeyBN254.Y.Bytes()...)
+	pubKeyHash := crypto.Keccak256Hash(merged)
+
+	check := keyAndSignAddr.PubkeyHash != pubKeyHash || keyAndSignAddr.Signer != o.operatorSignatureAddr
+
+	if check {
+		return fmt.Errorf("The key of the operator updated, Please restart")
+	}
+
 	o.logger.Infof("Starting operator.")
 
 	if o.config.EnableNodeApi {
@@ -437,4 +453,22 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 	o.logger.Debug("Signed task response", "taskResponseHash", hex.EncodeToString(taskResponseHash[:]))
 	o.logger.Debug("Signed task response", "signedTaskResponse", signedTaskResponse)
 	return signedTaskResponse, nil
+}
+
+func (o *Operator) UpdateOperatorBlsKeyAndSigner(ctx context.Context) error {
+
+	recipet, err := o.avsWriter.UpdateBLSPublicKey(ctx, o.ecdsaKey, o.blsKeypair)
+	if err != nil {
+		o.logger.Error("Error updating operator bls key", "err", err)
+	} else {
+		o.logger.Info("The transaction of bls key was sent successfully, please pay close attention to the transaction status", "recipet", recipet)
+	}
+
+	signRecipet, err := o.avsWriter.UpdateOperatorSignAddr(ctx, o.ecdsaKey, o.operatorSignatureAddr)
+	if err != nil {
+		o.logger.Error("Error updating operator sign addr", "err", err)
+	} else {
+		o.logger.Info("The transaction of sign addr was sent successfully, please pay close attention to the transaction status", "signRecipet", signRecipet)
+	}
+	return nil
 }

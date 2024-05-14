@@ -82,6 +82,18 @@ type AvsWriterer interface {
 		quorumNumbers egtypes.QuorumNums,
 		pubkey regcoord.BN254G1Point,
 	) (*types.Receipt, error)
+
+	UpdateBLSPublicKey(
+		ctx context.Context,
+		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+		blsKeyPair *bls.KeyPair,
+	) (*types.Receipt, error)
+
+	UpdateOperatorSignAddr(
+		ctx context.Context,
+		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+		operatorSignatureAddr gethcommon.Address,
+	) (*types.Receipt, error)
 }
 
 type AvsWriter struct {
@@ -348,4 +360,123 @@ func NewAvsWriter(avsServiceBindings *AvsManagersBindings, logger logging.Logger
 		elReader:               elReader,
 		client:                 ethClient,
 	}
+}
+
+// returns the tx receipt, as well as the task index (which it gets from parsing the tx receipt logs)
+func (w *AvsWriter) SendNewTaskNumberToSquare(ctx context.Context, taskType uint8, responderThreshold uint8, stakeThreshold *big.Int) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error) {
+	txOpts, err := w.TxMgr.GetNoSendTxOpts()
+	if err != nil {
+		w.logger.Errorf("Error getting tx opts")
+		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err
+	}
+	tx, err := w.AvsContractBindings.TaskManager.CreateNewTask(txOpts, taskType, responderThreshold, stakeThreshold)
+	if err != nil {
+		w.logger.Errorf("Error assembling CreateNewTask tx")
+		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err
+	}
+	receipt, err := w.TxMgr.Send(ctx, tx)
+	if err != nil {
+		w.logger.Errorf("Error submitting CreateNewTask tx")
+		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err
+	}
+	newTaskCreatedEvent, err := w.AvsContractBindings.TaskManager.ContractOpenOracleTaskManagerFilterer.ParseNewTaskCreated(*receipt.Logs[0])
+	if err != nil {
+		w.logger.Error("Aggregator failed to parse new task created event", "err", err)
+		return cstaskmanager.IOpenOracleTaskManagerTask{}, 0, err
+	}
+	return newTaskCreatedEvent.Task, newTaskCreatedEvent.TaskIndex, nil
+}
+
+func (w *AvsWriter) SendAggregatedResponse(
+	ctx context.Context, task cstaskmanager.IOpenOracleTaskManagerTask,
+	taskResponse cstaskmanager.IOpenOracleTaskManagerTaskResponse,
+	nonSignerStakesAndSignature cstaskmanager.IBLSSignatureCheckerNonSignerStakesAndSignature,
+) (*types.Receipt, error) {
+	// txOpts, err := w.TxMgr.GetNoSendTxOpts()
+	// if err != nil {
+	// 	w.logger.Errorf("Error getting tx opts")
+	// 	return nil, err
+	// }
+	// tx, err := w.AvsContractBindings.TaskManager.RespondToTask(txOpts, task, taskResponse, nSignerStakesAndSignature)
+	// if err != nil {
+	// 	w.logger.Error("Error submitting SubmitTaskResponse tx while calling respondToTask", "err", err)
+	// 	return nil, err
+	// }
+	// receipt, err := w.TxMgr.Send(ctx, tx)
+	// if err != nil {
+	// 	w.logger.Errorf("Error submitting CreateNewTask tx")
+	// 	return nil, err
+	// }
+	return nil, nil
+}
+
+func (w *AvsWriter) UpdateBLSPublicKey(
+	ctx context.Context,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	blsKeyPair *bls.KeyPair,
+) (*types.Receipt, error) {
+	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivateKey.PublicKey)
+	w.logger.Info("update operator‘s bls key with the AVS's registry coordinator", "avs-service-manager", w.serviceManagerAddr, "operator", operatorAddr)
+	// params to register bls pubkey with bls apk registry
+	g1HashedMsgToSign, err := w.registryCoordinator.PubkeyRegistrationMessageHash(&bind.CallOpts{}, operatorAddr)
+	if err != nil {
+		return nil, err
+	}
+	signedMsg := utils.ConvertToBN254G1Point(
+		blsKeyPair.SignHashedToCurveMessage(utils.ConvertBn254GethToGnark(g1HashedMsgToSign)).G1Point,
+	)
+	G1pubkeyBN254 := utils.ConvertToBN254G1Point(blsKeyPair.GetPubKeyG1())
+	G2pubkeyBN254 := utils.ConvertToBN254G2Point(blsKeyPair.GetPubKeyG2())
+	pubkeyRegParams := regcoord.IBLSApkRegistryPubkeyRegistrationParams{
+		PubkeyRegistrationSignature: signedMsg,
+		PubkeyG1:                    G1pubkeyBN254,
+		PubkeyG2:                    G2pubkeyBN254,
+	}
+
+	noSendTxOpts, err := w.TxMgr.GetNoSendTxOpts()
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := w.registryCoordinator.UpdateBLSPublicKey(
+		noSendTxOpts,
+		pubkeyRegParams,
+	)
+	if err != nil {
+		return nil, err
+	}
+	receipt, err := w.TxMgr.Send(ctx, tx)
+	if err != nil {
+		return nil, errors.New("failed to send tx with err: " + err.Error())
+	}
+	w.logger.Info("successfully update operator's bls key with AVS registry coordinator", "tx hash", receipt.TxHash.String(), "avs-service-manager", w.serviceManagerAddr, "operator", operatorAddr)
+	return receipt, nil
+}
+
+func (w *AvsWriter) UpdateOperatorSignAddr(
+	ctx context.Context,
+	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+	operatorSignatureAddr gethcommon.Address,
+) (*types.Receipt, error) {
+	operatorAddr := crypto.PubkeyToAddress(operatorEcdsaPrivateKey.PublicKey)
+	w.logger.Info("update operator‘s sign addr with the AVS's registry coordinator", "avs-service-manager", w.serviceManagerAddr, "operator", operatorAddr, "operatorSignatureAddr", operatorSignatureAddr)
+
+	noSendTxOpts, err := w.TxMgr.GetNoSendTxOpts()
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := w.registryCoordinator.UpdateOperatorSignAddr(
+		noSendTxOpts,
+		operatorSignatureAddr,
+	)
+	if err != nil {
+		return nil, err
+	}
+	receipt, err := w.TxMgr.Send(ctx, tx)
+	if err != nil {
+		return nil, errors.New("failed to send tx with err: " + err.Error())
+	}
+	w.logger.Info("successfully update operator's sign addr with AVS registry coordinator", "tx hash", receipt.TxHash.String(), "avs-service-manager", w.serviceManagerAddr, "operator", operatorAddr, "operatorSignatureAddr", operatorSignatureAddr)
+	return receipt, nil
 }
