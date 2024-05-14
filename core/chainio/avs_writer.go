@@ -22,7 +22,6 @@ import (
 
 	regcoord "avs-oracle/contracts/bindings/RegistryCoordinator"
 
-	cstaskmanager "avs-oracle/contracts/bindings/OpenOracleTaskManager"
 	"avs-oracle/core/config"
 
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients/elcontracts"
@@ -34,17 +33,11 @@ import (
 )
 
 type AvsWriterer interface {
-	SendNewTaskNumberToSquare(
-		ctx context.Context,
-		taskType uint8,
-		responderThreshold uint8,
-		stakeThreshold *big.Int,
-	) (cstaskmanager.IOpenOracleTaskManagerTask, uint32, error)
-	SendAggregatedResponse(ctx context.Context,
-		task cstaskmanager.IOpenOracleTaskManagerTask,
-		taskResponse cstaskmanager.IOpenOracleTaskManagerTaskResponse,
-		nonSignerStakesAndSignature cstaskmanager.IBLSSignatureCheckerNonSignerStakesAndSignature,
-	) (*types.Receipt, error)
+	// SendAggregatedResponse(ctx context.Context,
+	// 	task cstaskmanager.IOpenOracleTaskManagerTask,
+	// 	taskResponse cstaskmanager.IOpenOracleTaskManagerTaskResponse,
+	// 	nonSignerStakesAndSignature cstaskmanager.IBLSSignatureCheckerNonSignerStakesAndSignature,
+	// ) (*types.Receipt, error)
 
 	// TODO(samlaf): an operator that is already registered in a quorum can register with another quorum without passing
 	// signatures perhaps we should add another sdk function for this purpose, that just takes in a quorumNumber and
