@@ -24,6 +24,7 @@ func UpdateOperator(ctx *cli.Context) error {
 	nodeConfig.OperatorAddress, _ = os.LookupEnv("OPERATOR_ADDRESS")
 	nodeConfig.BlsPrivateKeyStorePath, _ = os.LookupEnv("BLS_PRIVATE_KEY_PATH")
 	nodeConfig.EcdsaPrivateKeyStorePath, _ = os.LookupEnv("ECDSA_PRIVATE_KEY_PATH")
+	nodeConfig.EcdsaPrivateSignKeyStorePath, _ = os.LookupEnv("ECDSA_SIGNER_PRIVATE_KEY_PATH")
 	nodeConfig.EthRpcUrl, _ = os.LookupEnv("HTTP_RPC_URL")
 	nodeConfig.EthWsUrl, _ = os.LookupEnv("WS_RPC_URL")
 
