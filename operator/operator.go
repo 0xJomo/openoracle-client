@@ -323,7 +323,7 @@ func (o *Operator) Start(ctx context.Context) error {
 	check := keyAndSignAddr.PubkeyHash != pubKeyHash || keyAndSignAddr.Signer != o.operatorSignatureAddr
 
 	if check {
-		return fmt.Errorf("The key of the operator updated, Please restart")
+		return fmt.Errorf("The key of the operator not matched, Please restart")
 	}
 
 	o.logger.Infof("Starting operator.")
