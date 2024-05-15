@@ -171,9 +171,17 @@ func (o *Operator) FetchPrice(taskType uint8) (int64, error) {
 	var total float64 = 0.0
 	var totalWeight float64 = 0
 	var source uint8 = 0
-
+	taskTypeStr := fmt.Sprintf("HEAD%d", taskType)
+	cloudConfig, err := o.FetchCloudConfig()
+	if err != nil {
+		return 0, err
+	}
+	var linkConfig map[string]string
+	for key, _ := range cloudConfig[taskTypeStr] {
+		linkConfig = cloudConfig[taskTypeStr][key]
+	}
 	for ; source < DATA_SOURCE_COUNT; source++ {
-		res, err := o.FetchPriceFromSource(taskType, source)
+		res, err := o.FetchPriceFromSource(source, linkConfig)
 		if err != nil {
 			o.logger.Error("Error fetching from source", "err", err)
 			continue
@@ -189,15 +197,28 @@ func (o *Operator) FetchPrice(taskType uint8) (int64, error) {
 	return int64(total / totalWeight * 100), nil
 }
 
-func (o *Operator) FetchPriceFromSource(taskType uint8, source uint8) (float64, error) {
+func (o *Operator) FetchCloudConfig() (map[string]map[string]map[string]string, error) {
+	resp, err := http.Get("http://localhost:3001/api/price_feed_config")
+	if err != nil {
+		o.logger.Error("Error fetching from cloud", err)
+	}
+	defer resp.Body.Close()
+
+	var jsonData map[string]map[string]map[string]string
+	err = json.NewDecoder(resp.Body).Decode(&jsonData)
+	return jsonData, err
+}
+
+func (o *Operator) FetchPriceFromSource(source uint8, cloudConfig map[string]string) (float64, error) {
 	switch source {
 	case Cnbc:
 		o.metrics.IncNumRequestToCnbc()
-		cnbc_url := fmt.Sprintf(
-			"https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=%%40%s",
-			taskTypeToCnbcId[taskType],
-		)
+		//cnbc_url := fmt.Sprintf(
+		//	"https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=%%40%s",
+		//	taskTypeToCnbcId[taskType],
+		//)
 		// fmt.Println(cnbc_url)
+		cnbc_url := cloudConfig["Cnbc"]
 		resp, err := http.Get(cnbc_url)
 		if err != nil {
 			o.metrics.IncNumErrorFromCnbc()
@@ -230,12 +251,13 @@ func (o *Operator) FetchPriceFromSource(taskType uint8, source uint8) (float64, 
 		// Format the date into YYYYMMDD type
 		formatted := fmt.Sprintf("%d%02d%02d", now.Year(), now.Month(), now.Day())
 		formatted_yesterday := fmt.Sprintf("%d%02d%02d", yesterday.Year(), yesterday.Month(), yesterday.Day())
-		insider_url := fmt.Sprintf(
-			"https://markets.businessinsider.com/Ajax/Chart_GetChartData?instrumentType=Commodity&tkData=300002,%s,0,333&from=%s&to=%s",
-			taskTypeToInsiderType[taskType],
-			formatted_yesterday,
-			formatted,
-		)
+		//insider_url := fmt.Sprintf(
+		//	"https://markets.businessinsider.com/Ajax/Chart_GetChartData?instrumentType=Commodity&tkData=300002,%s,0,333&from=%s&to=%s",
+		//	taskTypeToInsiderType[taskType],
+		//	formatted_yesterday,
+		//	formatted,
+		//)
+		insider_url := fmt.Sprintf(cloudConfig["Insider"], formatted_yesterday, formatted)
 		// fmt.Println(insider_url)
 		resp, err := http.Get(insider_url)
 		if err != nil {
@@ -256,10 +278,11 @@ func (o *Operator) FetchPriceFromSource(taskType uint8, source uint8) (float64, 
 		}
 	case Nasdaq:
 		o.metrics.IncNumRequestToNasdaq()
-		nasdaq_url := fmt.Sprintf(
-			"https://api.nasdaq.com/api/quote/%s/summary?assetclass=commodities",
-			taskTypeToNasdaqId[taskType],
-		)
+		//nasdaq_url := fmt.Sprintf(
+		//	"https://api.nasdaq.com/api/quote/%s/summary?assetclass=commodities",
+		//	taskTypeToNasdaqId[taskType],
+		//)
+		nasdaq_url := cloudConfig["Nasdaq"]
 		// fmt.Println(nasdaq_url)
 
 		client := &http.Client{}
@@ -296,12 +319,12 @@ func (o *Operator) FetchPriceFromSource(taskType uint8, source uint8) (float64, 
 		return val, nil
 	case Tradingview:
 		o.metrics.IncNumRequestToTradingview()
-		tradingview_url := fmt.Sprintf(
-			"https://scanner.tradingview.com/symbol?fields=close&symbol=%s",
-			taskTypeToTradingviewId[taskType],
-		)
+		//tradingview_url := fmt.Sprintf(
+		//	"https://scanner.tradingview.com/symbol?fields=close&symbol=%s",
+		//	taskTypeToTradingviewId[taskType],
+		//)
 		// fmt.Println(tradingview_url)
-
+		tradingview_url := cloudConfig["Tradingview"]
 		client := &http.Client{}
 		req, _ := http.NewRequest("GET", tradingview_url, nil)
 		// req.Header.Add("Accept", "*/*")
