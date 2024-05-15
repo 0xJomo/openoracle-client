@@ -318,10 +318,7 @@ func (o *Operator) Start(ctx context.Context) error {
 	}
 	G1pubkeyBN254 := utils.ConvertToBN254G1Point(o.blsKeypair.GetPubKeyG1())
 	check := false
-	o.logger.Info("operator info", "G1pubkeyBN254", G1pubkeyBN254, "G1Point", G1Point, "signerAddr", signerAddr, "operatorSignatureAddr", o.operatorSignatureAddr)
-	if G1pubkeyBN254.X.Cmp(G1Point.X) == 0 && G1pubkeyBN254.Y.Cmp(G1Point.Y) == 0 {
-
-	} else {
+	if G1pubkeyBN254.X.Cmp(G1Point.X) != 0 || G1pubkeyBN254.Y.Cmp(G1Point.Y) != 0 {
 		check = true
 	}
 
