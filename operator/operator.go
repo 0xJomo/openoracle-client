@@ -460,18 +460,33 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 
 func (o *Operator) UpdateOperatorBlsKeyAndSigner(ctx context.Context) error {
 
-	recipet, err := o.avsWriter.UpdateBLSPublicKey(ctx, o.ecdsaKey, o.blsKeypair)
+	G1Point, _, signerAddr, err := o.avsReader.GetOperatorBlsKeyAndSignAddr(&bind.CallOpts{}, o.operatorAddr)
 	if err != nil {
-		o.logger.Error("Error updating operator bls key", "err", err)
-	} else {
-		o.logger.Info("The transaction of bls key was sent successfully, please pay close attention to the transaction status", "recipet", recipet)
+		o.logger.Error("Error checking if operator is registered", "err", err)
+		return err
+	}
+	G1pubkeyBN254 := utils.ConvertToBN254G1Point(o.blsKeypair.GetPubKeyG1())
+
+	if G1pubkeyBN254.X.Cmp(G1Point.X) != 0 || G1pubkeyBN254.Y.Cmp(G1Point.Y) != 0 {
+		recipet, err := o.avsWriter.UpdateBLSPublicKey(ctx, o.ecdsaKey, o.blsKeypair)
+		if err != nil {
+			o.logger.Error("Error updating operator bls key", "err", err)
+		} else {
+			o.logger.Info("The transaction of bls key was sent successfully, please pay close attention to the transaction status", "recipet", recipet)
+		}
+	}else{
+		o.logger.Info("The operator bls key is already updated")
 	}
 
-	signRecipet, err := o.avsWriter.UpdateOperatorSignAddr(ctx, o.ecdsaKey, o.operatorSignatureAddr)
-	if err != nil {
-		o.logger.Error("Error updating operator sign addr", "err", err)
-	} else {
-		o.logger.Info("The transaction of sign addr was sent successfully, please pay close attention to the transaction status", "signRecipet", signRecipet)
+	if signerAddr != o.operatorSignatureAddr {
+		signRecipet, err := o.avsWriter.UpdateOperatorSignAddr(ctx, o.ecdsaKey, o.operatorSignatureAddr)
+		if err != nil {
+			o.logger.Error("Error updating operator sign addr", "err", err)
+		} else {
+			o.logger.Info("The transaction of sign addr was sent successfully, please pay close attention to the transaction status", "signRecipet", signRecipet)
+		}
+	} else{
+		o.logger.Info("The operator sign addr is already updated")
 	}
 	return nil
 }
