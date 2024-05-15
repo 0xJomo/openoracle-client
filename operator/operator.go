@@ -326,7 +326,7 @@ func (o *Operator) Start(ctx context.Context) error {
 		check = true
 	}
 	if check {
-		return fmt.Errorf("The key of the operator not matched, Please restart")
+		return fmt.Errorf("The key of the operator not matched. Update bls key or signer using update-operator-bls-key-and-signer before starting operator")
 	}
 
 	o.logger.Infof("Starting operator.")

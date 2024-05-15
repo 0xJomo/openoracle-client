@@ -35,7 +35,7 @@ func main() {
 			Action:  actions.UpdateOperator,
 		},
 		{
-			Name:    "update-operator-blsKey-and-signer",
+			Name:    "update-operator-bls-key-and-signer",
 			Aliases: []string{"u"},
 			Usage:   "update operator bls key and signer",
 			Action:  actions.UpdateOperatorBlSKeyAndSigner,
