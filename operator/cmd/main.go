@@ -1,14 +1,11 @@
 package main
 
 import (
+	"avs-oracle/core/config"
+	"avs-oracle/operator/cmd/actions"
+	"github.com/urfave/cli"
 	"log"
 	"os"
-
-	"avs-oracle/operator/cmd/actions"
-
-	"github.com/urfave/cli"
-
-	"avs-oracle/core/config"
 )
 
 func main() {
