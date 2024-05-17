@@ -138,6 +138,7 @@ type SignedTaskResponse struct {
 	ChainName       string                                            `json:"chainName"`
 	TaskResponse    *cstaskmanager.IOpenOracleTaskManagerTaskResponse `json:"taskResponse"`
 	OperatorAddress string                                            `json:"operatorAddress"`
+	SignerAddress string                                            `json:"signerAddress"`
 	Signature       string                                            `json:"signature"`
 }
 
@@ -198,7 +199,7 @@ func (o *Operator) FetchPrice(taskType uint8) (int64, error) {
 }
 
 func (o *Operator) FetchCloudConfig() (map[string]map[string]map[string]string, error) {
-	resp, err := http.Get("http://localhost:3001/api/price_feed_config")
+	resp, err := http.Get(o.priceCloudConfigUrl)
 	if err != nil {
 		o.logger.Error("Error fetching from cloud", err)
 	}

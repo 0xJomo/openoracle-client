@@ -71,6 +71,8 @@ type Operator struct {
 	newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated
 	// ip address of aggregator
 	aggregatorServerIpPortAddr string
+	// price cloud config url
+	priceCloudConfigUrl string
 	// needed when opting in to avs (allow this service manager contract to slash operator)
 	credibleSquaringServiceManagerAddr common.Address
 }
@@ -264,6 +266,7 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		operatorAddr:                       common.HexToAddress(c.OperatorAddress),
 		operatorSignatureAddr:              common.HexToAddress(c.OperatorSignatureAddress),
 		aggregatorServerIpPortAddr:         c.AggregatorServerIpPortAddress,
+		priceCloudConfigUrl:                c.PriceCloudConfigUrl,
 		newTaskCreatedChan:                 make(chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated),
 		credibleSquaringServiceManagerAddr: common.HexToAddress(c.AVSRegistryCoordinatorAddress),
 		operatorId:                         [32]byte{0}, // this is set below
@@ -450,6 +453,7 @@ func (o *Operator) SignTaskResponse(taskResponse *cstaskmanager.IOpenOracleTaskM
 		Signature:       "0x" + hex.EncodeToString(signature),
 		ChainName:       chainName,
 		OperatorAddress: o.config.OperatorAddress,
+		SignerAddress: o.config.OperatorSignatureAddress,
 	}
 	o.logger.Debug("Signed task response", "signature", hex.EncodeToString(signature))
 	o.logger.Debug("Signed task response", "taskResponse", taskResponse)

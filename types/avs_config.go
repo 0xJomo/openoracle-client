@@ -13,6 +13,7 @@ type NodeConfig struct {
 	EcdsaPrivateKeyStorePath      string            `yaml:"ecdsa_private_key_store_path"`
 	EcdsaPrivateSignKeyStorePath  string            `yaml:"ecdsa_sign_private_key_store_path"`
 	AggregatorServerIpPortAddress string            `yaml:"aggregator_server_ip_port_address"`
+	PriceCloudConfigUrl string            			`yaml:"price_config_server_ip_port_address"`
 	RegisterOperatorOnStartup     bool              `yaml:"register_operator_on_startup"`
 	EigenMetricsIpPortAddress     string            `yaml:"eigen_metrics_ip_port_address"`
 	EnableMetrics                 bool              `yaml:"enable_metrics"`
