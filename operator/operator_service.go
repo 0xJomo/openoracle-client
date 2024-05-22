@@ -167,20 +167,11 @@ func SendECDSASignedRequest(payload SignedTaskResponse, url string) error {
 	return nil
 }
 
-func (o *Operator) FetchPrice(taskType uint8) (int64, error) {
+func (o *Operator) FetchPrice(linkConfig map[string]string) (int64, error) {
 	// Generate a random number to randomly choose a data source
 	var total float64 = 0.0
 	var totalWeight float64 = 0
 	var source uint8 = 0
-	taskTypeStr := fmt.Sprintf("HEAD%d", taskType)
-	cloudConfig, err := o.FetchCloudConfig()
-	if err != nil {
-		return 0, err
-	}
-	var linkConfig map[string]string
-	for key, _ := range cloudConfig[taskTypeStr] {
-		linkConfig = cloudConfig[taskTypeStr][key]
-	}
 	for ; source < DATA_SOURCE_COUNT; source++ {
 		res, err := o.FetchPriceFromSource(source, linkConfig)
 		if err != nil {

@@ -2,6 +2,7 @@ package operator
 
 import (
 	"avs-oracle/core/chainio/utils"
+	"avs-oracle/operator/service"
 	"context"
 	cryptoecdsa "crypto/ecdsa"
 	"encoding/hex"
@@ -416,11 +417,40 @@ func (o *Operator) ProcessNewTaskCreatedLog(chainTaskManager chainio.ChainTaskMa
 	// 	return nil, error
 	// }
 
-	price, error := o.FetchPrice(newTaskCreatedLog.Task.TaskType)
-	if error != nil {
-		o.logger.Error("Fetching price", "error", error)
-		return nil, error
+	taskType := newTaskCreatedLog.Task.TaskType
+	taskTypeStr := fmt.Sprintf("HEAD%d", taskType)
+	cloudConfig, err := o.FetchCloudConfig()
+	if err != nil {
+		return nil, err
 	}
+	var linkConfig map[string]string
+	for key, _ := range cloudConfig[taskTypeStr] {
+		o.logger.Info("Task type", "key", key)
+		linkConfig = cloudConfig[taskTypeStr][key]
+	}
+
+	var price int64
+	switch taskType {
+	case 14:
+		{
+			teamValue, error := service.FetchTeamValueWithUrl(linkConfig)
+			if error != nil {
+				o.logger.Error("Fetching team value", "error", error)
+				return nil, error
+			}
+			price = int64(teamValue)
+		}
+	default:
+		{
+			priceTemp, error := o.FetchPrice(linkConfig)
+			if error != nil {
+				o.logger.Error("Fetching price", "error", error)
+				return nil, error
+			}
+			price = priceTemp
+		}
+	}
+	o.logger.Info("Fetched price", "price", price)
 
 	taskResponse := cstaskmanager.IOpenOracleTaskManagerTaskResponse{
 		ReferenceTaskIndex: newTaskCreatedLog.TaskIndex,
