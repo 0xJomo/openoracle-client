@@ -433,7 +433,7 @@ func (o *Operator) ProcessNewTaskCreatedLog(chainTaskManager chainio.ChainTaskMa
 	switch taskType {
 	case 14:
 		{
-			teamValue, error := service.FetchTeamValueWithUrl(linkConfig)
+			teamValue, error := service.FetchTeamValueWithUrl(linkConfig, newTaskCreatedLog.TaskData)
 			if error != nil {
 				o.logger.Error("Fetching team value", "error", error)
 				return nil, error

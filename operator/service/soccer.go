@@ -3,13 +3,14 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 
 const (
-	apisportsURL = "https://api-football-v1.p.rapidapi.com/v3/teams/statistics?league=%d&season=%d&team=%d"
 	rapidAPIKey  = "9dc27740a8msh7c20f698e7c01dep1bb9f5jsna5734f460b94"
-	rapidAPIHost = "api-football-v1.p.rapidapi.com"
 )
 
 type TeamStatisticsResponse struct {
@@ -161,19 +162,20 @@ type Cards struct {
 
 // FetchTeamStatistics fetches team statistics for a given season and team ID
 func FetchTeamStatisticsFromSportsWithUrl(urlStr string) (int, int, int, int, error) {
-	fmt.Println("Fetching from url:", urlStr)
+	//fmt.Println("Fetching from url:", urlStr)
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("error sending request: %v", err)
 	}
-
+	urlStrURL, err := url.Parse(urlStr)
 	req.Header.Add("X-RapidAPI-Key", rapidAPIKey)
-	req.Header.Add("X-RapidAPI-Host", rapidAPIHost)
+	req.Header.Add("X-RapidAPI-Host", urlStrURL.Host)
 
-	client := &http.Client{}
+	//client := &http.Client{}
 
-	//proxyUrl, err := url.Parse("http://192.168.1.52:7890")
-	//client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
+	proxyUrl, err := url.Parse("http://192.168.1.52:7890")
+
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -194,29 +196,30 @@ func FetchTeamStatisticsFromSportsWithUrl(urlStr string) (int, int, int, int, er
 	return GS, MW, CS, GD, nil
 }
 
-func FetchTeamValueWithUrl(linkConfig map[string]string ) (int, error) {
+func FetchTeamValueWithUrl(linkConfig map[string]string, taskData []byte) (int, error) {
+	//0000002700000000000007e700000021
+	hexData := common.Bytes2Hex(taskData)
+	//Assuming league ID is always 39
+	league, err := strconv.ParseUint(hexData[:8], 16, 32)
+	season, err:= strconv.ParseUint(hexData[8:24], 16, 64)
+	teamId, err:= strconv.ParseUint(hexData[24:], 16, 32)
 
-
-	seasons := []int{2020, 2021, 2022, 2023}
-	teamValue := 0
-	teamId := 33
-
-	for _, season := range seasons {
-		urlStr := fmt.Sprintf(linkConfig["rapid"], season, teamId)
-		GS_sports, MW_sports, CS_sports, GD_sports, err := FetchTeamStatisticsFromSportsWithUrl(urlStr)
-		if err != nil {
-			fmt.Println(err)
-			return 0, err // Return immediately if there's an error
-		}
-
-		fmt.Println("****Season****:", season)
-		fmt.Println("Goals Scored:", GS_sports)
-		fmt.Println("Matches Won:", MW_sports)
-		fmt.Println("Clean Sheets:", CS_sports)
-		fmt.Println("Goal Difference:", GD_sports)
-
-		teamValue += GS_sports + MW_sports + CS_sports + GD_sports
+	teamValue  := 0
+	urlStr := fmt.Sprintf(linkConfig["rapid"], league, season, teamId)
+	GS_sports, MW_sports, CS_sports, GD_sports, err := FetchTeamStatisticsFromSportsWithUrl(urlStr)
+	if err != nil {
+		fmt.Println(err)
+		return 0, err // Return immediately if there's an error
 	}
+
+	//fmt.Println("****Season****:", season)
+	//fmt.Println("Goals Scored:", GS_sports)
+	//fmt.Println("Matches Won:", MW_sports)
+	//fmt.Println("Clean Sheets:", CS_sports)
+	//fmt.Println("Goal Difference:", GD_sports)
+
+	teamValue += GS_sports + MW_sports + CS_sports + GD_sports
+
 
 	return teamValue, nil
 }
