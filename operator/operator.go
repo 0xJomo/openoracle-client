@@ -325,8 +325,7 @@ func (o *Operator) Start(ctx context.Context) error {
 	if G1pubkeyBN254.X.Cmp(G1Point.X) != 0 || G1pubkeyBN254.Y.Cmp(G1Point.Y) != 0 {
 		check = true
 	}
-	isNull := o.operatorSignatureAddr == common.Address{}
-
+	isNull := signerAddr == common.Address{}
 	if !isNull {
 		if signerAddr != o.operatorSignatureAddr {
 			check = true
