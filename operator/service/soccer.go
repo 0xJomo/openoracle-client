@@ -171,11 +171,7 @@ func FetchTeamStatisticsFromSportsWithUrl(urlStr string) (int, int, int, int, er
 	req.Header.Add("X-RapidAPI-Key", rapidAPIKey)
 	req.Header.Add("X-RapidAPI-Host", urlStrURL.Host)
 
-	//client := &http.Client{}
-
-	proxyUrl, err := url.Parse("http://192.168.1.52:7890")
-
-	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyUrl)}}
+	client := &http.Client{}
 
 	res, err := client.Do(req)
 	if err != nil {
