@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -68,8 +69,6 @@ type Operator struct {
 	operatorId            sdktypes.OperatorId
 	operatorAddr          common.Address
 	operatorSignatureAddr common.Address
-	// receive new tasks in this chan (typically from listening to onchain event)
-	newTaskCreatedChan chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated
 	// ip address of aggregator
 	aggregatorServerIpPortAddr string
 	// price cloud config url
@@ -268,7 +267,6 @@ func NewOperatorFromConfig(c types.NodeConfig) (*Operator, error) {
 		operatorSignatureAddr:              common.HexToAddress(c.OperatorSignatureAddress),
 		aggregatorServerIpPortAddr:         c.AggregatorServerIpPortAddress,
 		priceCloudConfigUrl:                c.PriceCloudConfigUrl,
-		newTaskCreatedChan:                 make(chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated),
 		credibleSquaringServiceManagerAddr: common.HexToAddress(c.AVSRegistryCoordinatorAddress),
 		operatorId:                         [32]byte{0}, // this is set below
 
@@ -349,14 +347,18 @@ func (o *Operator) Start(ctx context.Context) error {
 	}
 
 	// TODO(samlaf): wrap this call with increase in avs-node-spec metric
-	var runningTaskManagers = len(o.avsSubscriber.GetAvsContractBindings().TaskManagers)
+	var wg sync.WaitGroup
 	for _, taskManager := range o.avsSubscriber.GetAvsContractBindings().TaskManagers {
+		wg.Add(1)
 		go func(tm chainio.ChainTaskManager) {
-			sub := o.avsSubscriber.SubscribeToNewTasks(tm, o.newTaskCreatedChan)
+			taskCreatedChan := make(chan *cstaskmanager.ContractOpenOracleTaskManagerNewTaskCreated)
+			sub := o.avsSubscriber.SubscribeToNewTasks(tm, taskCreatedChan)
 			for {
 				select {
 				case <-ctx.Done():
-					runningTaskManagers--
+					wg.Done()
+					sub.Unsubscribe()
+					close(taskCreatedChan)
 					return
 				case err := <-metricsErrChan:
 					// TODO(samlaf); we should also register the service as unhealthy in the node api
@@ -367,8 +369,8 @@ func (o *Operator) Start(ctx context.Context) error {
 					// TODO(samlaf): write unit tests to check if this fixed the issues we were seeing
 					sub.Unsubscribe()
 					// TODO(samlaf): wrap this call with increase in avs-node-spec metric
-					sub = o.avsSubscriber.SubscribeToNewTasks(tm, o.newTaskCreatedChan)
-				case newTaskCreatedLog := <-o.newTaskCreatedChan:
+					sub = o.avsSubscriber.SubscribeToNewTasks(tm, taskCreatedChan)
+				case newTaskCreatedLog := <-taskCreatedChan:
 					o.metrics.IncNumTasksReceived()
 					// TODO: call aggregator API to check if task has received enough response
 					taskResponse, err := o.ProcessNewTaskCreatedLog(tm, newTaskCreatedLog)
@@ -387,11 +389,8 @@ func (o *Operator) Start(ctx context.Context) error {
 			}
 		}(taskManager)
 	}
-	for {
-		if runningTaskManagers <= 0 {
-			break
-		}
-	}
+	wg.Wait()
+
 	return nil
 }
 
