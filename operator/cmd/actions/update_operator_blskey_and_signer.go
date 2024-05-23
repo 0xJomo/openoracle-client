@@ -6,10 +6,11 @@ import (
 	"avs-oracle/types"
 	"context"
 	"encoding/json"
-	sdkutils "github.com/Layr-Labs/eigensdk-go/utils"
-	"github.com/urfave/cli"
 	"log"
 	"os"
+
+	sdkutils "github.com/Layr-Labs/eigensdk-go/utils"
+	"github.com/urfave/cli"
 )
 
 func UpdateOperatorBlSKeyAndSigner(ctx *cli.Context) error {
@@ -21,7 +22,7 @@ func UpdateOperatorBlSKeyAndSigner(ctx *cli.Context) error {
 		return err
 	}
 	nodeConfig.OperatorAddress, _ = os.LookupEnv("OPERATOR_ADDRESS")
-	nodeConfig.OperatorSignatureAddress, _ = os.LookupEnv("OPERATOR_SIGNER_ADDRESS")
+	nodeConfig.OperatorSignatureAddress, _ = os.LookupEnv("OPERATOR_SIGNATURE_ADDRESS")
 	nodeConfig.BlsPrivateKeyStorePath, _ = os.LookupEnv("BLS_PRIVATE_KEY_PATH")
 	nodeConfig.EcdsaPrivateKeyStorePath, _ = os.LookupEnv("ECDSA_PRIVATE_KEY_PATH")
 	nodeConfig.EcdsaPrivateSignKeyStorePath, _ = os.LookupEnv("ECDSA_SIGNER_PRIVATE_KEY_PATH")
